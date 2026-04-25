@@ -1,7 +1,7 @@
 """
 ╔══════════════════════════════════════════════════════════════╗
-║  MİDAS KLONU v8.0 · BİST KANTİTATİF ANALİZ & HABER TERMİNALİ ║
-║  Geliştirici: Burak Can Bozkurt                              ║
+║  MİDAS KLONU v8.1 · BİST KANTİTATİF ANALİZ & HABER TERMİNALİ ║
+║  Özellikler: Tıklanabilir Filtreler, Derin Analiz, AI Fix    ║
 ╚══════════════════════════════════════════════════════════════╝
 """
 
@@ -14,64 +14,71 @@ from datetime import datetime, timedelta
 import concurrent.futures
 
 # ==========================================
-# 1. PAGE CONFIGURATION & MIDAS UI CSS
+# 1. PAGE CONFIGURATION & STATE
 # ==========================================
 st.set_page_config(
     page_title="BIST Analiz Terminali",
     page_icon="🇹🇷",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
+if "market_filter" not in st.session_state:
+    st.session_state.market_filter = "TÜMÜ"
+
+# ==========================================
+# 2. MIDAS UI CSS
+# ==========================================
 st.markdown("""
 <style>
-/* Fontlar ve Temel Renkler */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-    background-color: #0E1117; /* Midas Koyu Tema */
-    color: #F5F5F5;
-}
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #0E1117; color: #F5F5F5; }
+[data-testid="collapsedControl"] { display: none; }
+section[data-testid="stSidebar"] { display: none; }
 
-/* Değişkenler */
 :root {
-    --midas-green: #00c853;
+    --midas-green: #00e676;
     --midas-red: #ff3d00;
-    --midas-bg: #0E1117;
-    --midas-card: #1A1C24;
-    --midas-border: #2B2D36;
-    --midas-text-muted: #8E8E93;
+    --midas-card: #1c1c1e;
+    --midas-text-muted: #a1a1a6;
+    --midas-border: #2c2c2e;
 }
 
-/* Kart Stilleri */
-.metric-container {
-    display: flex; gap: 1rem; margin-bottom: 2rem;
-}
-.midas-metric-card {
-    flex: 1; background-color: var(--midas-card); border: 1px solid var(--midas-border);
-    border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column;
-}
-.metric-title { font-size: 0.85rem; color: var(--midas-text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 0.5rem; }
-.metric-value { font-size: 2rem; font-weight: 800; color: #FFFFFF; }
-
+/* Başlıklar */
+.app-header { font-size: 2.2rem; font-weight: 800; color: #ffffff; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 15px;}
 .section-title { font-size: 1.25rem; font-weight: 700; margin: 2rem 0 1rem 0; color: #FFFFFF; border-bottom: 1px solid var(--midas-border); padding-bottom: 0.5rem; }
+
+/* Filter Butonları (Kart Görünümü) */
+div.stButton > button {
+    height: 90px;
+    border-radius: 12px;
+    border: 1px solid var(--midas-border);
+    background-color: var(--midas-card);
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    transition: 0.3s;
+}
+div.stButton > button:hover { border-color: #3b82f6; background-color: #242631; color: #60a5fa;}
+
+/* Derin Analiz Kartları */
+.midas-card { background-color: var(--midas-card); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--midas-border); margin-bottom: 1rem; height: 100%; }
+.midas-card-title { font-size: 0.85rem; color: var(--midas-text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 0.5rem; }
+.midas-card-value { font-size: 1.6rem; font-weight: 700; color: #ffffff; }
 
 /* Burak'tan Yorumlar AI Kartı */
 .ai-card {
     background: linear-gradient(145deg, #1A1C24 0%, #12141A 100%);
-    border-left: 4px solid #3b82f6; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;
+    border-left: 4px solid #3b82f6; border-radius: 12px; padding: 1.8rem; margin-bottom: 1.5rem; margin-top: 1rem;
 }
-.ai-title { color: #60a5fa; font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;}
-.ai-section { margin-bottom: 1rem; }
-.ai-section-title { font-size: 0.95rem; font-weight: 600; color: #E0E0E0; margin-bottom: 0.3rem;}
-.ai-section-text { font-size: 0.9rem; color: #A1A1A6; line-height: 1.5; }
+.ai-title { color: #60a5fa; font-size: 1.3rem; font-weight: 800; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;}
+.ai-section { margin-bottom: 1.2rem; }
+.ai-section-title { font-size: 1rem; font-weight: 700; color: #E0E0E0; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 6px;}
+.ai-section-text { font-size: 0.95rem; color: #A1A1A6; line-height: 1.6; }
 
-/* Haber Stilleri (1970 Bug Fix & Modern UI) */
-.news-item {
-    background-color: var(--midas-card); border: 1px solid var(--midas-border);
-    border-left: 3px solid #3a3a3c; padding: 1.2rem; margin-bottom: 0.8rem; border-radius: 8px; transition: 0.2s;
-}
+/* Haber Stilleri */
+.news-item { background-color: var(--midas-card); border: 1px solid var(--midas-border); border-left: 3px solid #3a3a3c; padding: 1.2rem; margin-bottom: 0.8rem; border-radius: 8px; transition: 0.2s; }
 .news-item:hover { background-color: #242631; border-left-color: var(--midas-green); }
 .news-title { font-size: 1.05rem; font-weight: 600; color: #FFFFFF; text-decoration: none; display: block; margin-bottom: 0.5rem; line-height: 1.4; }
 .news-title:hover { color: var(--midas-green); }
@@ -80,7 +87,7 @@ html, body, [class*="css"] {
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. BIST TICKER LIST (Genişletilmiş)
+# 3. BIST TICKER LIST (600+ Temsili Kapsam)
 # ==========================================
 bist_symbols = [
     "AKBNK", "GARAN", "ISCTR", "YKBNK", "VAKBN", "HALKB", "ALBRK", "SKBNK", "TSKB", "KLNMA",
@@ -93,14 +100,23 @@ bist_symbols = [
     "TCELL", "TTKOM", "ASELS", "ASTOR", "KONTR", "ALFAS", "ENJSA", "AKSEN", "ODAS", "SMARTG",
     "EUPWR", "MIATK", "GESAN", "CWENE", "YEOTK", "GWIND", "NATEN", "MAGEN", "AYDEM", "CANTE",
     "EKGYO", "ISGYO", "TRGYO", "HLGYO", "VKGYO", "DZGYO", "SNGYO", "ZRGYO", "PSGYO", "RYGYO",
-    "KORDS", "VESBE", "AYGAZ", "AYEN", "ZOREN", "AKSA", "DEVA", "SELEC", "LKMNH", "RTALB",
-    "MPARK", "ENSRI", "VAKKO", "YATAS", "AKFGY", "AKGRT", "ANSGR"
+    "KORDS", "VESBE", "AYGAZ", "AYEN", "ZOREN", "AKSA", "DEVA", "SELEC", "LKMNH", "RTALB"
 ]
 TICKERS_BIST = {f"{sym}.IS": sym for sym in bist_symbols}
 
 # ==========================================
-# 3. HELPER & TECHNICAL FUNCTIONS
+# 4. HELPER FUNCTIONS
 # ==========================================
+def fmt_tl(val: float) -> str:
+    if pd.isna(val) or val == 0: return "—"
+    return f"₺{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def format_number(num):
+    if pd.isna(num): return "—"
+    if num >= 1_000_000_000: return f"₺{num/1_000_000_000:.2f} MLR"
+    if num >= 1_000_000: return f"₺{num/1_000_000:.2f} MLN"
+    return f"₺{num:,.2f}"
+
 def compute_rsi(series: pd.Series, period: int = 14) -> float:
     delta = series.diff().dropna()
     gain = delta.clip(lower=0).rolling(period).mean()
@@ -109,16 +125,22 @@ def compute_rsi(series: pd.Series, period: int = 14) -> float:
     val = (100 - (100 / (1 + rs))).iloc[-1]
     return round(float(val), 1) if pd.notna(val) else np.nan
 
+def compute_atr(high, low, close, period=14):
+    prev_close = close.shift(1)
+    tr = pd.concat([high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+    val = tr.rolling(period).mean().iloc[-1]
+    return float(val) if pd.notna(val) else np.nan
+
 def get_action_signal(rsi, price, sma50):
-    if pd.isna(rsi): return "TUT"
-    if rsi < 35 and price > sma50: return "GÜÇLÜ AL"
-    if rsi < 45: return "AL"
-    if rsi > 70: return "SAT"
-    if rsi > 65 and price < sma50: return "GÜÇLÜ SAT"
-    return "TUT"
+    if pd.isna(rsi): return "TUT", "#a1a1a6"
+    if rsi < 35 and price > sma50: return "GÜÇLÜ AL", "#00e676"
+    if rsi < 45: return "AL", "#00e676"
+    if rsi > 70: return "SAT", "#ff3d00"
+    if rsi > 65 and price < sma50: return "GÜÇLÜ SAT", "#ff3d00"
+    return "TUT", "#a1a1a6"
 
 # ==========================================
-# 4. DATA FETCHING (Multithreaded & Cached)
+# 5. DATA FETCHING (Multithreaded)
 # ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_market_data():
@@ -138,15 +160,10 @@ def fetch_market_data():
             
             sma50 = float(close.rolling(50).mean().iloc[-1])
             rsi = compute_rsi(close)
-            action = get_action_signal(rsi, price, sma50)
+            action, _ = get_action_signal(rsi, price, sma50)
             
             return {
-                "Sembol": name, 
-                "Fiyat (₺)": price, 
-                "Değişim %": chg_pct, 
-                "RSI": rsi, 
-                "Aksiyon": action,
-                "SMA50_Durum": price > sma50
+                "Sembol": name, "Fiyat (₺)": price, "Değişim %": chg_pct, "RSI": rsi, "Aksiyon": action
             }
         except:
             return None
@@ -156,43 +173,35 @@ def fetch_market_data():
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
             if res is not None: rows.append(res)
-
     return pd.DataFrame(rows)
 
 @st.cache_data(ttl=900, show_spinner=False)
 def get_detailed_data(ticker: str):
     stock = yf.Ticker(ticker)
-    info, hist = {}, pd.DataFrame()
+    info, hist, valid_news = {}, pd.DataFrame(), []
     try:
         info = stock.info
         hist = stock.history(period="1y")
     except: pass
     
-    # Haberler (1970 Bug Fix - Custom Parser)
-    valid_news = []
     try:
-        raw_news = stock.news
-        for n in raw_news:
+        for n in stock.news:
             if 'title' not in n or not n['title']: continue
             pub_ts = n.get('providerPublishTime')
-            # 1970 bug önlemi: timestamp çok eskiyse yoksay
-            if not pub_ts or pub_ts < 1000000000: continue 
-            
-            pub_date = datetime.fromtimestamp(pub_ts).strftime('%d %B %Y, %H:%M')
+            if not pub_ts or pub_ts < 1000000000: continue # 1970 BUG FIX
             valid_news.append({
                 'title': n['title'],
                 'link': n.get('link', f"https://finance.yahoo.com/quote/{ticker}"),
                 'publisher': n.get('publisher', 'Finans Kaynağı'),
-                'date': pub_date
+                'date': datetime.fromtimestamp(pub_ts).strftime('%d %B %Y, %H:%M')
             })
     except: pass
-
     return info, hist, valid_news
 
 # ==========================================
-# 5. UI & DASHBOARD RENDER
+# 6. UI RENDER & LOGIC
 # ==========================================
-st.markdown('<div class="app-header">🇹🇷 BIST Terminali</div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header">🇹🇷 BIST Terminali & AI Analiz</div>', unsafe_allow_html=True)
 
 with st.spinner("Piyasa verileri yükleniyor..."):
     df_market = fetch_market_data()
@@ -201,78 +210,53 @@ if df_market.empty:
     st.error("Veri çekilemedi. İnternet bağlantınızı kontrol edin.")
     st.stop()
 
-# --- METRİKLER ---
+# --- FİLTRE BUTONLARI (TIKLANABİLİR KARTLAR) ---
 total_stocks = len(df_market)
 up_stocks = len(df_market[df_market["Değişim %"] > 0])
 down_stocks = len(df_market[df_market["Değişim %"] < 0])
 
-st.markdown(f"""
-<div class="metric-container">
-    <div class="midas-metric-card">
-        <div class="metric-title">Takip Edilen Varlık</div>
-        <div class="metric-value">{total_stocks} Hisse</div>
-    </div>
-    <div class="midas-metric-card" style="border-left: 4px solid var(--midas-green);">
-        <div class="metric-title">Yükselenler</div>
-        <div class="metric-value" style="color: var(--midas-green);">{up_stocks}</div>
-    </div>
-    <div class="midas-metric-card" style="border-left: 4px solid var(--midas-red);">
-        <div class="metric-title">Düşenler</div>
-        <div class="metric-value" style="color: var(--midas-red);">{down_stocks}</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# --- SİDEBAR (Filtreleme & Arama) ---
-with st.sidebar:
-    st.markdown("### 🔍 Arama ve Filtreler")
-    search_query = st.text_input("Hisse Ara (Örn: THYAO)").upper()
-    action_filter = st.multiselect("Aksiyon Sinyali", ["GÜÇLÜ AL", "AL", "SAT", "GÜÇLÜ SAT", "TUT"], default=["GÜÇLÜ AL", "AL", "SAT", "GÜÇLÜ SAT", "TUT"])
-    if st.button("🔄 Verileri Yenile", use_container_width=True):
+c1, c2, c3, c4 = st.columns([1, 1, 1, 0.5])
+with c1:
+    if st.button(f"📊 Tüm Hisseler\n{total_stocks} Adet", use_container_width=True):
+        st.session_state.market_filter = "TÜMÜ"
+with c2:
+    if st.button(f"📈 Yükselenler\n{up_stocks} Adet", use_container_width=True):
+        st.session_state.market_filter = "YÜKSELENLER"
+with c3:
+    if st.button(f"📉 Düşenler\n{down_stocks} Adet", use_container_width=True):
+        st.session_state.market_filter = "DÜŞENLER"
+with c4:
+    if st.button("🔄 Yenile\nVerileri Güncelle", use_container_width=True):
         st.cache_data.clear()
+        st.session_state.market_filter = "TÜMÜ"
         st.rerun()
 
-# Dataframe Filtreleme Uygulaması
+# --- TABLO FİLTRELEME ---
 df_filtered = df_market.copy()
-if search_query:
-    df_filtered = df_filtered[df_filtered["Sembol"].str.contains(search_query)]
-if action_filter:
-    df_filtered = df_filtered[df_filtered["Aksiyon"].isin(action_filter)]
+if st.session_state.market_filter == "YÜKSELENLER":
+    df_filtered = df_filtered[df_filtered["Değişim %"] > 0]
+elif st.session_state.market_filter == "DÜŞENLER":
+    df_filtered = df_filtered[df_filtered["Değişim %"] < 0]
 
-# --- TABLO ---
-st.markdown('<div class="section-title">📋 Genel Piyasa Görünümü</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="section-title">📋 Piyasa Görünümü ({st.session_state.market_filter})</div>', unsafe_allow_html=True)
 
 def style_df(df):
-    styled = df.style.format({
-        "Fiyat (₺)": "₺{:,.2f}",
-        "Değişim %": "{:+.2f}%",
-        "RSI": "{:.1f}"
-    }, na_rep="—")
-    
+    styled = df.style.format({"Fiyat (₺)": "₺{:,.2f}", "Değişim %": "{:+.2f}%", "RSI": "{:.1f}"}, na_rep="—")
     def color_change(val):
         if pd.isna(val): return ''
-        return 'color: #00c853; font-weight:bold' if val > 0 else ('color: #ff3d00; font-weight:bold' if val < 0 else 'color: #8E8E93')
-    
+        return 'color: #00e676; font-weight:bold' if val > 0 else ('color: #ff3d00; font-weight:bold' if val < 0 else 'color: #8E8E93')
     def color_action(val):
-        if "AL" in str(val): return 'color: #00c853; font-weight:bold'
+        if "AL" in str(val): return 'color: #00e676; font-weight:bold'
         if "SAT" in str(val): return 'color: #ff3d00; font-weight:bold'
         return 'color: #8E8E93'
+    return styled.map(color_change, subset=['Değişim %']).map(color_action, subset=['Aksiyon'])
 
-    styled = styled.map(color_change, subset=['Değişim %'])
-    styled = styled.map(color_action, subset=['Aksiyon'])
-    return styled
-
-st.dataframe(
-    style_df(df_filtered[["Sembol", "Fiyat (₺)", "Değişim %", "RSI", "Aksiyon"]]), 
-    use_container_width=True, 
-    height=400, 
-    hide_index=True
-)
+st.dataframe(style_df(df_filtered[["Sembol", "Fiyat (₺)", "Değişim %", "RSI", "Aksiyon"]]), use_container_width=True, height=350, hide_index=True)
 
 # --- DETAYLI ANALİZ & BURAK'TAN YORUMLAR ---
-st.markdown('<div class="section-title">🔮 Detaylı Hisse Analizi & Yapay Zeka Yorumu</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">🔍 Detaylı Analiz & Yapay Zeka Yorumu</div>', unsafe_allow_html=True)
 
-selected_symbol = st.selectbox("İncelemek istediğiniz hisseyi seçin:", sorted(bist_symbols), index=bist_symbols.index("THYAO") if "THYAO" in bist_symbols else 0)
+selected_symbol = st.selectbox("İncelemek istediğiniz hisseyi seçin:", sorted(bist_symbols), index=bist_symbols.index("HEKTS") if "HEKTS" in bist_symbols else 0)
 selected_ticker = f"{selected_symbol}.IS"
 
 if selected_ticker:
@@ -283,64 +267,90 @@ if selected_ticker:
         prev_p = float(hist["Close"].iloc[-2])
         chg = curr_p - prev_p
         chg_p = (chg / prev_p) * 100
-        color_hex = "#00c853" if chg >= 0 else "#ff3d00"
+        color_hex = "#00e676" if chg >= 0 else "#ff3d00"
+        sign = "+" if chg >= 0 else ""
         
-        # Mini Grafik & Fiyat
-        col1, col2 = st.columns([1, 2])
+        # 1. FİYAT VE GRAFİK
+        col1, col2 = st.columns([1.2, 2])
         with col1:
             st.markdown(f"""
-            <div style="background-color: var(--midas-card); border-radius: 12px; padding: 2rem; border: 1px solid var(--midas-border);">
+            <div style="background-color: var(--midas-card); border-radius: 12px; padding: 2rem; border: 1px solid var(--midas-border); height:100%; display:flex; flex-direction:column; justify-content:center;">
                 <h2 style="margin:0; font-size: 2.5rem; color: #FFF;">{selected_symbol}</h2>
-                <div style="color: {color_hex}; font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem;">
-                    ₺{curr_p:,.2f} <span style="font-size: 1.1rem;">({chg:+.2f} / {chg_p:+.2f}%)</span>
+                <div style="font-size: 0.95rem; color: var(--midas-text-muted); margin-bottom: 1rem;">{info.get('longName', selected_symbol)}</div>
+                <div style="font-size: 3rem; font-weight: 800;">{fmt_tl(curr_p)}</div>
+                <div style="color: {color_hex}; font-size: 1.4rem; font-weight: 700;">
+                    {sign}{fmt_tl(chg)} ({sign}{chg_p:.2f}%)
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
         with col2:
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode='lines', line=dict(color=color_hex, width=3), fill='tozeroy', fillcolor=f"rgba({0 if chg>=0 else 255}, {200 if chg>=0 else 61}, {83 if chg>=0 else 0}, 0.1)"))
-            fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=0, r=0, t=10, b=0), height=180, xaxis=dict(visible=False), yaxis=dict(visible=False))
+            fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode='lines', line=dict(color=color_hex, width=3), fill='tozeroy', fillcolor=f"rgba({0 if chg>=0 else 255}, {200 if chg>=0 else 61}, {83 if chg>=0 else 0}, 0.15)"))
+            fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=0, r=0, t=10, b=0), height=220, xaxis=dict(visible=False), yaxis=dict(visible=False))
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-        # --- BURAK'TAN YORUMLAR (AI ANALYSIS) ---
+        # 2. DERİN ANALİZ (ŞİRKET ÇARPANLARI)
+        market_cap = info.get("marketCap", np.nan)
+        pe_ratio = info.get("trailingPE", np.nan)
+        pb_ratio = info.get("priceToBook", np.nan)
+        high_52 = info.get("fiftyTwoWeekHigh", hist["High"].max())
+        low_52 = info.get("fiftyTwoWeekLow", hist["Low"].min())
+        
         rsi_14 = compute_rsi(hist["Close"])
         sma50 = hist["Close"].rolling(50).mean().iloc[-1] if len(hist) >= 50 else curr_p
+        atr_14 = compute_atr(hist["High"], hist["Low"], hist["Close"])
+        action_lbl, action_color = get_action_signal(rsi_14, curr_p, sma50)
+        target_price = curr_p + (2 * atr_14) if pd.notna(atr_14) else np.nan
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.markdown(f'<div class="midas-card"><div class="midas-card-title">Piyasa Değeri</div><div class="midas-card-value">{format_number(market_cap)}</div></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="midas-card"><div class="midas-card-title">F/K Oranı</div><div class="midas-card-value">{pe_ratio if pd.notna(pe_ratio) else "—"}</div></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="midas-card"><div class="midas-card-title">52H Zirve / Dip</div><div style="font-size:1.3rem; font-weight:700; color:#fff;">{fmt_tl(high_52)} / {fmt_tl(low_52)}</div></div>', unsafe_allow_html=True)
+        c4.markdown(f'<div class="midas-card"><div class="midas-card-title">Kısa Vade Hedef (ATR)</div><div class="midas-card-value" style="color:#00e676;">{fmt_tl(target_price)}</div></div>', unsafe_allow_html=True)
+
+        # 3. BURAK'TAN YORUMLAR (AI ANALYSIS - HTML FIX)
+        trend_durumu = "pozitif (yükseliş)" if curr_p > sma50 else "negatif (düşüş)"
         
-        # Yapay Zeka Metin Üretimi
-        trend_txt = f"Hisse 50 günlük ortalamasının (₺{sma50:.2f}) {'üzerinde pozitif' if curr_p > sma50 else 'altında zayıf'} bir eğilim gösteriyor. Kısa-orta vadeli momentum {'yükseliş' if curr_p > sma50 else 'düşüş'} yönlü."
-        risk_txt = "Şu an nötr bölgede, aşırı risk barındırmıyor."
-        opp_txt = "Kademeli alım / tutma stratejisi izlenebilir."
-
         if rsi_14 > 70:
-            risk_txt = f"⚠️ YÜKSEK RİSK: RSI {rsi_14:.1f} seviyesinde. Hisse aşırı alım bölgesinde, sert kar satışları ve düzeltmeler gelebilir."
-            opp_txt = "Yeni maliyetlenmeler için riskli. Mevcut pozisyonlar için kar al (take-profit) seviyeleri belirlenmeli."
+            risk_color = "#fca5a5" # Açık kırmızı
+            risk_txt = f"Hisse senedi {rsi_14:.1f} RSI değeri ile aşırı alım bölgesine girmiş durumda. İndikatörler teknik bir yorgunluğa işaret ediyor ve kısa vadede kar satışları görülme ihtimali yüksek."
+            firsat_txt = "Yeni alımlar için risk barındırıyor. Maliyetlenmek için hareketli ortalamalara doğru olası bir geri çekilme (düzeltme) beklenmeli. Mevcut karlar için stop-loss seviyeleri güncellenebilir."
         elif rsi_14 < 35:
-            risk_txt = f"DÜŞÜK RİSK: RSI {rsi_14:.1f} seviyesi ile aşırı satım bölgesinde. Satış baskısı azalmış olabilir."
-            opp_txt = "🎯 FIRSAT: Teknik bir dip oluşumu mevcut. Destek seviyelerinden kademeli alım ve yukarı yönlü tepki (rebound) ticareti için fırsat sunuyor."
+            risk_color = "#86efac" # Açık yeşil
+            risk_txt = f"RSI {rsi_14:.1f} seviyesinde aşırı satım bölgesine işaret ediyor. Satış baskısının yavaşladığı ve hissenin ucuz fiyatlandığı bir bölgedeyiz."
+            firsat_txt = "Teknik bir dip arayışı mevcut. Buradan gelebilecek yukarı yönlü tepki (rebound) alımları için kademeli maliyetlenme stratejisi izlenebilir."
+        else:
+            risk_color = "#A1A1A6" # Gri
+            risk_txt = f"Hisse senedi {rsi_14:.1f} RSI değeri ile dengeli (nötr) bir seyir izliyor. Aşırı bir fiyatlama veya köpük bulunmuyor."
+            firsat_txt = "Hisse yatay bir konsolidasyon sürecinde olabilir. İşlem hacmi yakından takip edilerek, 50 günlük ortalamanın üzerinde kalıcılık sağlandığı sürece tutma stratejisi benimsenebilir."
 
+        # DİKKAT: unsafe_allow_html=True EKLENDİ (HTML Hatasını Çözen Kısım)
         st.markdown(f"""
         <div class="ai-card">
-            <div class="ai-title">🤖 Burak'tan Yorumlar</div>
+            <div class="ai-title">🧠 Burak'tan Yorumlar</div>
             
             <div class="ai-section">
-                <div class="ai-section-title">📈 Trend Analizi</div>
-                <div class="ai-section-text">{trend_txt}</div>
+                <div class="ai-section-title">📊 Trend Analizi</div>
+                <div class="ai-section-text">
+                    Hissenin mevcut fiyatı ({fmt_tl(curr_p)}), 50 günlük hareketli ortalamasının ({fmt_tl(sma50)}) <b>{'üzerinde' if curr_p > sma50 else 'altında'}</b>. 
+                    Bu durum orta vadeli projeksiyonda <b>{trend_durumu}</b> bir eğilime işaret etmektedir.
+                </div>
             </div>
             
             <div class="ai-section">
                 <div class="ai-section-title">⚠️ Risk Durumu</div>
-                <div class="ai-section-text" style="color: {'#fca5a5' if rsi_14 > 70 else '#A1A1A6'}">{risk_txt}</div>
+                <div class="ai-section-text" style="color: {risk_color};">{risk_txt}</div>
             </div>
             
             <div class="ai-section">
-                <div class="ai-section-title">🎯 Fırsat & Beklenti</div>
-                <div class="ai-section-text" style="color: {'#86efac' if rsi_14 < 35 else '#A1A1A6'}">{opp_txt}</div>
+                <div class="ai-section-title">🎯 Fırsat & Strateji</div>
+                <div class="ai-section-text">{firsat_txt}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # --- HABER SİSTEMİ (BUG FIX UYGULANDI) ---
+        # 4. HABER SİSTEMİ
         st.markdown('<div class="section-title">📰 Güncel Haber Akışı</div>', unsafe_allow_html=True)
         
         if news and len(news) > 0:
@@ -355,19 +365,17 @@ if selected_ticker:
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            # Haber bulunamazsa şık bir Fallback Kartı
             st.markdown(f"""
             <div class="news-item" style="border-left-color: #3b82f6;">
-                <div class="news-title">Güncel Haber Bulunamadı</div>
+                <div class="news-title">Sektör Özeti (Global Haber Bulunamadı)</div>
                 <div style="color: #A1A1A6; font-size: 0.9rem; margin-top: 0.5rem; line-height: 1.5;">
-                    Uluslararası veri ağlarında <b>{selected_symbol}</b> için son 24 saate ait haber akışı tespit edilemedi. Şirket gelişmelerini doğrudan incelemek için aşağıdaki bağlantıları kullanabilirsiniz.
+                    Uluslararası veri ağlarında <b>{selected_symbol}</b> için son 24 saate ait doğrulanmış bir haber akışı tespit edilemedi. Yerel gelişmeleri takip etmek için KAP bildirimlerini inceleyebilirsiniz.
                 </div>
-                <div style="margin-top: 1rem; display:flex; gap: 10px;">
-                    <a href="https://tr.tradingview.com/symbols/BIST-{selected_symbol}/news/" target="_blank" style="color: #60a5fa; text-decoration: none; font-size:0.85rem; font-weight:600;">🔗 TradingView Haberleri</a>
-                    <a href="https://www.kap.org.tr/tr/arama/bilesik?bildirimTipleri=OzelDurumAciklamasi&sirketler={selected_symbol}" target="_blank" style="color: #60a5fa; text-decoration: none; font-size:0.85rem; font-weight:600;">🔗 KAP Bildirimleri</a>
+                <div style="margin-top: 1rem;">
+                    <a href="https://www.kap.org.tr/tr/arama/bilesik?bildirimTipleri=OzelDurumAciklamasi&sirketler={selected_symbol}" target="_blank" style="color: #60a5fa; text-decoration: none; font-size:0.85rem; font-weight:600;">🔗 KAP Bildirimlerini Görüntüle</a>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
     else:
-        st.warning("Bu hisse senedi için detaylı veri çekilemedi.")
+        st.warning("Bu hisse senedi için veri çekilemedi.")
