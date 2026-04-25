@@ -1,6 +1,6 @@
 """
 ╔══════════════════════════════════════════════════════════════╗
-║  KİŞİSEL FİNANS MERKEZİ  ·  v4.0 (Pro Trader Edition)        ║
+║  KİŞİSEL FİNANS MERKEZİ  ·  v5.0 (Pro Trader Edition)        ║
 ║  Sekme 1 : Kantitatif Piyasa Tarayıcısı + Kripto + Simülatör ║
 ║  Sekme 2 : Borç Erime & Özgürlük Simülatörü                  ║
 ╚══════════════════════════════════════════════════════════════╝
@@ -24,7 +24,7 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────────────────────
-#  GLOBAL STİL (Yenilenmiş, Daha Güçlü Fontlar)
+#  GLOBAL STİL (Yenilenmiş, Daha Güçlü Fontlar ve Hizalamalar)
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -91,7 +91,11 @@ button[data-baseweb="tab"][aria-selected="true"] {
 .kpi-card.cyan::before   { background: linear-gradient(90deg,#06b6d4,#22d3ee); }
 
 .kpi-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; font-weight: 600; color: #8899b8; text-transform: uppercase; margin-bottom: 0.5rem; }
-.kpi-value { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem; line-height: 1; margin-bottom: 0.3rem; }
+/* DÜZELTME: KPI Değeri Ortada */
+.kpi-value { 
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem; line-height: 1; margin-bottom: 0.3rem; 
+    text-align: center; display: flex; justify-content: center; 
+}
 .kpi-value.red    { color: #f87171; }
 .kpi-value.green  { color: #34d399; }
 .kpi-value.amber  { color: #fbbf24; }
@@ -167,17 +171,83 @@ def calculate_amortization(principal: float, monthly_rate: float, monthly_paymen
         })
     return pd.DataFrame(rows)
 
-TICKERS_BIST_US = {
-    "THYAO.IS": "Türk Hava Yolları", "GARAN.IS": "Garanti BBVA", "ASELS.IS": "Aselsan",
-    "EREGL.IS": "Ereğli Demir Çelik", "KCHOL.IS": "Koç Holding", "SISE.IS": "Şişecam",
-    "AAPL": "Apple", "TSLA": "Tesla", "NVDA": "NVIDIA", "MSFT": "Microsoft"
+# DÜZELTME: Taranan Varlık Sayısını Arttırdım (Alabildiğine)
+TICKERS_BIST = {
+    # BIST30 Tamamı
+    "AKBNK.IS": "Akbank", "AKSEN.IS": "Aksa Enerji", "ALARK.IS": "Alarko Holding",
+    "ARCLK.IS": "Arçelik", "ASELS.IS": "Aselsan", "BIMAS.IS": "BİM Mağazalar",
+    "DOAS.IS": "Doğuş Otomotiv", "EKGYO.IS": "Emlak Konut REIC", "ENKAI.IS": "Enka İnşaat",
+    "EREGL.IS": "Ereğli Demir Çelik", "FROTO.IS": "Ford Otosan", "GARAN.IS": "Garanti BBVA",
+    "GUBRF.IS": "Gübre Fabrikaları", "HEKTS.IS": "Hektaş", "ISCTR.IS": "İş Bankası (C)",
+    "KCHOL.IS": "Koç Holding", "KONTR.IS": "Kontrolmatik Teknoloji", "KOZAL.IS": "Koza Altın İşletmeleri",
+    "KRDMD.IS": "Kardemir (D)", "ODAS.IS": "Odaş Elektrik", "PETKM.IS": "Petkim",
+    "PGSUS.IS": "Pegasus Hava Yolları", "SAHOL.IS": "Sabancı Holding", "SASA.IS": "Sasa Polyester",
+    "SISE.IS": "Şişecam", "TCELL.IS": "Turkcell", "THYAO.IS": "Türk Hava Yolları",
+    "TOASO.IS": "Tofaş Otomotiv", "TUPRS.IS": "Tüpraş", "YKBNK.IS": "Yapı Kredi Bankası",
+    # Popüler Diğer
+    "AEEFES.IS": "Anadolu Efes", "AGHOL.IS": "AG Anadolu Grubu Holding", "BMEKS.IS": "Bimeks (Aşırı Volatil)",
+    "DOHOL.IS": "Doğan Holding", "HALKB.IS": "Halk Bankası", "MGROS.IS": "Migros Ticaret",
+    "OTKAR.IS": "Otokar", "SKBNK.IS": "Şekerbank", "SOKM.IS": "Şok Marketler Ticaret",
+    "TATGD.IS": "Tat Gıda Ticaret", "TKFEN.IS": "Tekfen Holding", "TSPOR.IS": "Trabzonspor Sportif",
+    "TTKOM.IS": "Türk Telekom", "VAKBN.IS": "Vakıfbank", "VESTL.IS": "Vestel",
+    "YATAS.IS": "Yataş",
+}
+
+TICKERS_US = {
+    # Teknoloji Devleri
+    "AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "NVIDIA", "GOOG": "Alphabet (A)",
+    "GOOGL": "Alphabet (C)", "AMZN": "Amazon", "META": "Meta Platforms", "TSLA": "Tesla",
+    "AMD": "AMD", "INTC": "Intel", "AVGO": "Broadcom", "QCOM": "Qualcomm",
+    "CSCO": "Cisco Systems", "ADBE": "Adobe", "CRM": "Salesforce", "NFLX": "Netflix",
+    "PYPL": "PayPal", "SQ": "Block", "UBER": "Uber Technologies", "SNOW": "Snowflake",
+    # Finans & Sağlık & Perakende
+    "JPM": "JPMorgan Chase", "BAC": "Bank of America", "WFC": "Wells Fargo", "GS": "Goldman Sachs",
+    "MS": "Morgan Stanley", "V": "Visa", "MA": "Mastercard", "AXP": "American Express",
+    "JNJ": "Johnson & Johnson", "PFE": "Pfizer", "ABBV": "AbbVie", "MRK": "Merck",
+    "WMT": "Walmart", "HD": "Home Depot", "LOW": "Lowe's", "COST": "Costco",
+    "DIS": "Walt Disney", "PEP": "PepsiCo", "KO": "Coca-Cola", "NKE": "Nike",
+    "SBUX": "Starbucks", "MCD": "McDonald's", "BA": "Boeing", "XOM": "Exxon Mobil",
+    "CVX": "Chevron", "ORCL": "Oracle", "IBM": "IBM", "TXN": "Texas Instruments",
+    "MU": "Micron Technology", "ABT": "Abbott Laboratories", "ELV": "Elevance Health",
+    "LLY": "Eli Lilly", "CVS": "CVS Health", "UNH": "UnitedHealth Group",
+    "HD": "Home Depot", "LOW": "Lowe's", "HON": "Honeywell", "CAT": "Caterpillar",
+    "DE": "Deere & Company", "LMT": "Lockheed Martin", "RTX": "RTX Corporation",
+    "GE": "GE Aerospace", "MMM": "3M", "T": "AT&T", "VZ": "Verizon Communications",
 }
 
 TICKERS_CRYPTO = {
     "BTC-USD": "Bitcoin", "ETH-USD": "Ethereum", "BNB-USD": "Binance Coin",
     "SOL-USD": "Solana", "XRP-USD": "Ripple", "AVAX-USD": "Avalanche",
-    "DOGE-USD": "Dogecoin", "ADA-USD": "Cardano"
+    "DOGE-USD": "Dogecoin", "ADA-USD": "Cardano", "LINK-USD": "Chainlink",
+    "MATIC-USD": "Polygon", "DOT-USD": "Polkadot", "XLM-USD": "Stellar",
+    "LTC-USD": "Litecoin", "BCH-USD": "Bitcoin Cash", "SHIB-USD": "Shiba Inu",
+    "UNI-USD": "Uniswap", "LINK-USD": "Chainlink", "TRX-USD": "TRON",
+    "ATOM-USD": "Cosmos", "XMR-USD": "Monero", "ETC-USD": "Ethereum Classic",
+    "FIL-USD": "Filecoin", "APT-USD": "Aptos", "NEAR-USD": "NEAR Protocol",
 }
+
+# Birleşik Liste
+def get_extended_tickers(asset_type: str) -> dict:
+    if asset_type == "Kripto (Bitcoin vb.)":
+        return TICKERS_CRYPTO
+    
+    combined_tickers = {}
+    if asset_type in ["Tümü", "🇹🇷 Hisse (Borsa İstanbul)"]:
+        combined_tickers.update(TICKERS_BIST)
+    if asset_type in ["Tümü", "🇺🇸 Hisse (Amerika Pazarı)"]:
+        combined_tickers.update(TICKERS_US)
+    
+    if asset_type == "Tümü":
+        return combined_tickers # Bu durum şu an filtrelemede yok ama fonksiyonel
+    elif not combined_tickers: # asset_type spesifik hisse seçimi ise, o hisseyi barındıran listeyi bulmaya çalış
+        # Bu kısım selected_ticker için `fetch_market_data`'da kullanılıyor
+        #selected_ticker, selected_name = asset_type.split(" - ")
+        if asset_type in TICKERS_BIST: return {asset_type: TICKERS_BIST[asset_type]}
+        if asset_type in TICKERS_US: return {asset_type: TICKERS_US[asset_type]}
+        if asset_type in TICKERS_CRYPTO: return {asset_type: TICKERS_CRYPTO[asset_type]}
+
+    return combined_tickers
+
 
 def compute_rsi(series: pd.Series, period: int = 14) -> float:
     delta = series.diff().dropna()
@@ -215,45 +285,129 @@ def generate_signal(row: dict) -> tuple[str, str, str]:
     if pd.notna(above) and not above: return "↘ Zayıf Trend", "signal-watch", "TUT"
     return "◼ Bekle", "signal-hold", "TUT"
 
+# DÜZELTME: Kelly Olasılık Hesabı (Abartılmış ve Felaket Odaklı)
+def calculate_win_prob_felaket(rsi, hist, above, atr_pct, r_to_reward) -> float:
+    """
+    Abartılmış ve Felaket analiz için kazanma olasılığı hesabı. Kelly için p.
+    RSI, MACD, Trend ve Volatiliteyi kullanarak olasılık belirler.
+    Asimetrik risk-off odaklı felaket analiz (kazanma olasılığı düşükse Kelly girmeyi engeller).
+    """
+    base_p = 0.50 # Temel olasılık (%50 - Nötr)
+    
+    # RSI Etkisi (Aşırı satılmışsa p artar, aşırı alınmışsa p azalır)
+    if rsi < 30: base_p += 0.15 # Al ihtimali artar (%65)
+    elif rsi < 40: base_p += 0.08
+    elif rsi > 70: base_p -= 0.15 # Sat ihtimali artar (Al olasılığı %35)
+    elif rsi > 60: base_p -= 0.08
+
+    # MACD Hist Etkisi (Artış varsa p artar)
+    if hist > 0: base_p += 0.05
+    elif hist < 0: base_p -= 0.05
+
+    # Trend Etkisi (Above SMA50)
+    if above: base_p += 0.10
+    else: base_p -= 0.10
+
+    # Volatilite Etkisi (Felaket Analiz: Volatilite yüksekse kazanç olasılığını azalt)
+    if atr_pct > 5: base_p -= 0.05 # Yüksek volatilite = Yüksek risk, p azalır
+    if atr_pct > 8: base_p -= 0.08 # Felaket volatilite = Felaket risk, p daha çok azalır
+
+    # Risk/Ödül Oranı Etkisi (Felaket Analiz: Risk, Ödülden büyükse girmeyi engelle)
+    if r_to_reward < 1: base_p -= 0.20 # Felaket Risk: Olasılığı %20 düşür
+
+    # Olasılık Sınırları (0.01 - 0.99)
+    return max(0.01, min(0.99, base_p))
+
 @st.cache_data(ttl=900, show_spinner=False)
-def fetch_market_data(asset_type: str) -> pd.DataFrame:
+def fetch_market_data(asset_type: str, selected_ticker_full: str = None) -> pd.DataFrame:
     end = datetime.today()
-    start = end - timedelta(days=365)
+    start = end - timedelta(days=365*2) # Simülasyon için 2 yıllık veri
     rows = []
-    tickers_dict = TICKERS_CRYPTO if asset_type == "Kripto (Bitcoin vb.)" else TICKERS_BIST_US
+    
+    # asset_type filtre ise extended, selected_ticker ise tekli çekim
+    tickers_dict = {}
+    if selected_ticker_full:
+        tickers_dict = {selected_ticker_full: ""} # Sadece seçilen hisseyi çek
+    else:
+        tickers_dict = get_extended_tickers(asset_type)
+
+    if not tickers_dict: return pd.DataFrame(rows)
 
     for ticker, name in tickers_dict.items():
         try:
             df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
-            if df.empty or len(df) < 60: continue
+            if df.empty or len(df) < 120: continue # Simülasyon için yeterli veri olmalı
 
             close = df["Close"].squeeze()
             high = df["High"].squeeze()
             low = df["Low"].squeeze()
+            volume = df["Volume"].squeeze()
+
+            # Son 1 yıllık (52 hafta) verileri kullan
+            df_1y = df.iloc[-252:] if len(df) >= 252 else df
+            close_1y = df_1y["Close"].squeeze()
+            high_1y = df_1y["High"].squeeze()
+            low_1y = df_1y["Low"].squeeze()
 
             price = float(close.iloc[-1])
             prev_price = float(close.iloc[-2])
             chg_pct = (price - prev_price) / prev_price * 100
-            high_52w = float(high.max())
-            low_52w = float(low.min())
+            high_52w = float(high_1y.max())
+            low_52w = float(low_1y.min())
+
+            # Simülasyon için Volatilite Hesabı
+            atr = compute_atr(high, low, close)
+            atr_pct = round(atr / price * 100, 2) if price else np.nan
 
             sma50 = float(close.rolling(50).mean().iloc[-1])
             rsi = compute_rsi(close)
             macd_v, macd_sig, macd_hist = compute_macd(close)
-            atr = compute_atr(high, low, close)
-            atr_pct = round(atr / price * 100, 2) if price else np.nan
+            atr_sim = compute_atr(high, low, close) # Simülasyon için aynı ATR, her iki taraf için
+            
+            # Kuantitatif Hedefler ve Felaket Analiz (v5.0 Abartılmış Kısım)
+            # Volatilite Bazlı Hedefler
+            t1_reward_f = price + (2 * atr) # T1 (Hızlı Kar Al) Hedef
+            t2_reward_f = price + (4 * atr) # T2 (Maksimum Beklenti) Hedef
+            # Volatilite Bazlı Felaket Stop (Abartılmış)
+            stop_f = price - (1.5 * atr) # Kuantitatif Stop
+            
+            # Risk/Ödül Hesabı (Stop ile Kar Al arası oran)
+            reward_val = (t1_reward_f + t2_reward_f) / 2 # Ortalama Kar Al (Abartılmış)
+            risk_reward_ratio_f = (reward_val - price) / (price - stop_f) if (price - stop_f) != 0 else np.nan
 
+            # Kazanma Olasılığı (Abartılmış p)
+            above_sma50 = price > sma50
+            win_p_f = calculate_win_prob_felaket(rsi, macd_hist, above_sma50, atr_pct, risk_reward_ratio_f)
+
+            # Kelly Kriteri Tabanlı Pozisyon (Abartılmış Pozisyonlama)
+            # Kasa % hesabı (risk_reward_ratio_f = f* = p - q/b)
+            kelly_f_percent = win_p_f - ( (1-win_p_f) / risk_reward_ratio_f ) if pd.notna(risk_reward_ratio_f) and risk_reward_ratio_f != 0 else np.nan
+            kelly_f_percent = max(0, min(kelly_f_percent, 1.0)) if pd.notna(kelly_f_percent) else np.nan # Kelly oranı (0 - 1)
+
+            market_label = ""
+            currency = ""
             if "USD" in ticker:
-                market, currency = "₿ Kripto", "$"
+                market_label = "₿ Kripto"
+                currency = "$"
             else:
-                market = "🇹🇷 BIST" if ticker.endswith(".IS") else "🇺🇸 ABD"
+                market_label = "🇹🇷 BIST" if ticker.endswith(".IS") else "🇺🇸 ABD"
                 currency = "₺" if ticker.endswith(".IS") else "$"
 
+            # Şirket adı boşsa tickers'dan al, fetch_market_data(selected_ticker_full) için boş kalmasın
+            if selected_ticker_full and not name:
+                if selected_ticker_full in TICKERS_BIST: name = TICKERS_BIST[selected_ticker_full]
+                elif selected_ticker_full in TICKERS_US: name = TICKERS_US[selected_ticker_full]
+                elif selected_ticker_full in TICKERS_CRYPTO: name = TICKERS_CRYPTO[selected_ticker_full]
+                if not name: name = selected_ticker_full # Hiç bulunamazsa ticker ismini koy
+
             row_data = {
-                "Ticker": ticker, "Şirket": name, "Piyasa": market, "Fiyat": price, "Döviz": currency,
+                "Ticker": ticker, "Şirket": name, "Piyasa": market_label, "Fiyat": price, "Döviz": currency,
                 "Değişim %": chg_pct, "RSI": rsi, "MACD_Hist": macd_hist, "SMA-50": sma50,
-                "Above_SMA50": price > sma50, "F/SMA": price / sma50 if sma50 else 0, "ATR %": atr_pct,
-                "52H_Zirve": high_52w, "52H_Dip": low_52w
+                "Above_SMA50": above_sma50, "F/SMA": price / sma50 if sma50 else 0, "ATR %": atr_pct,
+                "52H_Zirve": high_52w, "52H_Dip": low_52w,
+                # Kuantitatif Felaket Analiz Metrikleri
+                "T1_Hedef": t1_reward_f, "T2_Hedef": t2_reward_f, "Stop_Seviyesi": stop_f,
+                "Risk_Reward": risk_reward_ratio_f, "Kazanma_Olasiligi": win_p_f, "Kelly_Kasa_Percent": kelly_f_percent
             }
             sig_label, sig_class, action = generate_signal(row_data)
             row_data["Sinyal"] = sig_label
@@ -271,7 +425,13 @@ def fetch_market_data(asset_type: str) -> pd.DataFrame:
 with st.sidebar:
     st.markdown("### ⚙️ Varlık & Filtreler")
     
-    asset_class = st.radio("Piyasa Seçimi", ["Hisse Senedi (Borsa)", "Kripto (Bitcoin vb.)"], help="Tarama yapılacak piyasayı seçin.")
+    # DÜZELTME: Piyasa Bayrakları Sidebar'da
+    asset_class = st.radio(
+        "Piyasa Seçimi", 
+        ["🇹🇷 Hisse (Borsa İstanbul)", "🇺🇸 Hisse (Amerika Pazarı)", "Kripto (Bitcoin vb.)"],
+        help="Tarama yapılacak piyasayı seçin."
+    )
+    
     st.markdown("---")
     
     sinyal_filtre = st.multiselect("Aksiyon Durumu", ["AL", "SAT", "TUT"], default=["AL", "SAT", "TUT"])
@@ -295,18 +455,19 @@ tab_market, tab_debt = st.tabs([
 # ║  SEKME 1 — MARKET SCREENER + GELECEK SİMÜLATÖRÜ              ║
 # ╚══════════════════════════════════════════════════════════════╝
 with tab_market:
-    st.markdown('<div class="hero"><div class="hero-title market">Kantitatif Trader Terminali</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero"><div class="hero-title market">Kantitatif Trader Terminali (Yüzlerce Varlık)</div></div>', unsafe_allow_html=True)
 
     hdr_col, btn_col = st.columns([6, 1])
     with btn_col:
+        # DÜZELTME: Verileri Yenile İkonu
         if st.button("🔄 Verileri Yenile", type="primary", use_container_width=True):
             st.cache_data.clear()
 
-    with st.spinner(f"📡 {asset_class} verileri çekiliyor ve analiz ediliyor..."):
+    with st.spinner(f"📡 {asset_class} verileri çekiliyor ve analiz ediliyor... (Uzun Sürebilir)"):
         df_raw = fetch_market_data(asset_class)
 
     if df_raw.empty:
-        st.error("⚠️ Veri çekilemedi. İnternet bağlantınızı kontrol edin.")
+        st.error("⚠️ Veri çekilemedi. İnternet bağlantınızı kontrol edin veya varlık listesini kontrol edin.")
     else:
         # Filtreleri Uygula
         df_f = df_raw.copy()
@@ -335,6 +496,7 @@ with tab_market:
         with m4:
             avg_rsi = df_raw["RSI"].mean()
             rc = "green" if avg_rsi < 40 else "amber" if avg_rsi < 65 else "red"
+            # DÜZELTME: KPI Değeri Ortada (CSS ile sağlandı)
             st.markdown(f"""<div class="kpi-card {rc}">
             <div class="kpi-label">Piyasa Ort. RSI</div>
             <div class="kpi-value {rc}">{avg_rsi:.1f}</div>
@@ -343,7 +505,7 @@ with tab_market:
         st.markdown("<div style='height:15px'></div>", unsafe_allow_html=True)
 
         # Sinyal Motoru Tablosu
-        st.markdown('<div class="section-hdr">⚡ CANLI PİYASA VE HIZLI AKSİYON TABLOSU</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-hdr">⚡ CANLI PİYASA VE HIZLI AKSİYON TABLOSU (Felaket-v5.0 Analiz)</div>', unsafe_allow_html=True)
 
         if df_f.empty:
             st.info("ℹ️ Seçili filtrelerle eşleşen varlık bulunamadı.")
@@ -353,6 +515,7 @@ with tab_market:
             def style_signal_table(df):
                 s = pd.DataFrame("", index=df.index, columns=df.columns)
                 for i, row in df.iterrows():
+                    # DÜZELTME: Piyasa Bayrakları Tablo'da (fetch_market_data'da market_label'da sağlandı)
                     if pd.notna(row.get("RSI")): s.loc[i, "RSI"] = "color:#34d399;font-weight:700" if row["RSI"] < 35 else "color:#f87171;font-weight:700" if row["RSI"] > 65 else ""
                     if pd.notna(row.get("Değişim %")): s.loc[i, "Değişim %"] = "color:#34d399" if row["Değişim %"] >= 0 else "color:#f87171"
                     
@@ -369,47 +532,102 @@ with tab_market:
             st.dataframe(styled, use_container_width=True, height=350, hide_index=True)
 
         # GELECEK SENARYOSU SİMÜLATÖRÜ
-        st.markdown('<div class="section-hdr">🔮 GELECEK SENARYOSU & DETAYLI ANALİZ (Tıkla ve Simüle Et)</div>', unsafe_allow_html=True)
+        # DÜZELTME: Felaket Derecede Abartılmış Simülatif Analiz v5.0
+        st.markdown('<div class="section-hdr">🔮 GELECEK SENARYOSU VE DETAYLI FELAKET ANALİZ (Abartılmış v5.0)</div>', unsafe_allow_html=True)
         col_sel, col_amt = st.columns([2, 1])
         with col_sel:
-            selected_ticker = st.selectbox("Analiz Edilecek Varlığı Seçin", df_raw["Ticker"].tolist())
+            # Analiz Edilecek Varlık Listesi Arttırıldı (Tarananların Tümü)
+            ticker_options = [f"{ticker} - {df_raw[df_raw['Ticker'] == ticker]['Şirket'].iloc[0]}" for ticker in df_raw['Ticker']]
+            selected_ticker_full_item = st.selectbox("Analiz Edilecek Varlığı Seçin (Abartılmış v5.0)", ticker_options)
+            selected_ticker_full = selected_ticker_full_item.split(" - ")[0] if selected_ticker_full_item else None
+
         with col_amt:
-            curr_symbol = df_raw[df_raw["Ticker"] == selected_ticker]["Döviz"].iloc[0]
+            curr_symbol = df_raw[df_raw["Ticker"] == selected_ticker_full]["Döviz"].iloc[0] if selected_ticker_full else ""
             invest_amount = st.number_input(f"Simülasyon Yatırım Tutarı ({curr_symbol})", min_value=10.0, value=1000.0, step=100.0)
 
-        if selected_ticker:
-            asset_data = df_raw[df_raw["Ticker"] == selected_ticker].iloc[0]
+        if selected_ticker_full:
+            asset_data = df_raw[df_raw["Ticker"] == selected_ticker_full].iloc[0]
             current_price = asset_data["Fiyat"]
-            ath = asset_data["52H_Zirve"]
-            atl = asset_data["52H_Dip"]
+            ath_52w = asset_data["52H_Zirve"]
+            atl_52w = asset_data["52H_Dip"]
             
+            # Kuantitatif Felaket Analiz Metrikleri (Abartılmış Kısım)
+            t1_hedef = asset_data["T1_Hedef"]
+            t2_hedef = asset_data["T2_Hedef"]
+            stop_seviyesi = asset_data["Stop_Seviyesi"]
+            risk_reward = asset_data["Risk_Reward"]
+            win_p = asset_data["Kazanma_Olasiligi"]
+            kelly_kasasi = asset_data["Kelly_Kasa_Percent"]
+            atr_pct_val = asset_data["ATR %"]
+
             units_bought = invest_amount / current_price
-            profit_ath = (units_bought * ath) - invest_amount
-            pct_ath = (ath - current_price) / current_price * 100
-            loss_atl = invest_amount - (units_bought * atl)
-            pct_atl = (current_price - atl) / current_price * 100
+            
+            # Simüle Yatırım Karlılığı (ATH/ATL Bazlı)
+            profit_ath = (units_bought * ath_52w) - invest_amount
+            pct_ath = (ath_52w - current_price) / current_price * 100
+            loss_atl = invest_amount - (units_bought * atl_52w)
+            pct_atl = (current_price - atl_52w) / current_price * 100
+            
+            # Kelly Kriteri Tabanlı Maksimum Pozisyon (Risk Analizi)
+            # Kelly Olasılığı Abartılmış (Felaket Analizine Göre Ayarlandı)
+            max_pos_kasas_tl = invest_amount * kelly_kasasi if pd.notna(kelly_kasasi) else 0 # Kelly oranıyla kasa hesabına göre yatırılması gereken tutar
+
+            # Volatilite Bazlı Felaket Analiz Metrikleri (TrailStopmantığı)
+            # Stop ve Hedeflerin Volatiliteye (ATR) Göre Kuantitatif Tahmini
             
             st.markdown(f"""
-            <div style='background:#0a0e18; border:1px solid #1e3a5f; border-radius:8px; padding:1.5rem; margin-top:1rem;'>
-                <h4 style='color:#60a5fa; margin-top:0; font-family:"Syne", sans-serif;'>{asset_data['Şirket']} ({selected_ticker}) Simülasyonu</h4>
-                <p style='font-family:"IBM Plex Mono", monospace; font-size:0.9rem; color:#8899b8;'>
-                    Güncel Fiyat: <b style='color:#d4dbe8'>{fmt_val(current_price, curr_symbol)}</b><br>
-                    Şu an <b style='color:#34d399'>{fmt_val(invest_amount, curr_symbol)}</b> yatırırsan tahmini olarak <b>{units_bought:.4f} adet</b> alırsın.
+            <div style='background:#0a0e18; border:2px solid #1e3a5f; border-radius:10px; padding:2rem; margin-top:1.5rem; border-left: 5px solid #1d4ed8; font-family:"Syne", sans-serif;'>
+                <h3 style='color:#60a5fa; margin-top:0; border-bottom: 2px solid #1e3a5f; padding-bottom: 0.5rem;'>{asset_data['Şirket']} ({selected_ticker_full}) Felaket Kuantitatif Tahmin Motoru & Risk/Ödül Analizi v5.0 (Abartılmış)</h3>
+                
+                <p style='font-family:"IBM Plex Mono", monospace; font-size:1.1rem; color:#8899b8; margin-top:1rem;'>
+                    Güncel Fiyat: <b style='color:#d4dbe8'>{fmt_val(current_price, curr_symbol)}</b> &nbsp;·&nbsp;
+                    Yatırılacak Tutar: <b style='color:#34d399'>{fmt_val(invest_amount, curr_symbol)}</b><br>
+                    Alınacak Adet: <b>{units_bought:.4f}</b>
                 </p>
-                <hr style='border-color:#161d2e'>
-                <div style='display:flex; justify-content:space-between;'>
-                    <div style='width:48%; background:#052e16; padding:1rem; border-radius:6px; border:1px solid #065f46;'>
-                        <div style='color:#34d399; font-weight:bold; margin-bottom:0.5rem;'>🚀 İyimser Senaryo (52 Hafta Zirvesi)</div>
-                        Hedef Fiyat: {fmt_val(ath, curr_symbol)} <br>
+                <hr style='border-color:#161d2e; margin: 1.5rem 0;'>
+                
+                <div style='display:flex; justify-content:space-between; gap: 1rem;'>
+                    <div style='width:48%; background:#052e16; padding:1.5rem; border-radius:8px; border:2px solid #065f46;'>
+                        <div style='color:#34d399; font-weight:bold; margin-bottom:0.75rem; font-size:1.1rem;'>🚀 İyimser Senaryo (52H Zirvesi Tabanlı)</div>
+                        Hedef Fiyat: {fmt_val(ath_52w, curr_symbol)} <br>
                         Yükseliş İhtimali Potansiyeli: <b>+%{pct_ath:.1f}</b> <br>
-                        <div style='margin-top:0.5rem; font-size:1.1rem;'>Tahmini Kar: <b style='color:#10b981'>+{fmt_val(profit_ath, curr_symbol)}</b></div>
+                        <div style='margin-top:1rem; font-size:1.3rem; border-top: 1px solid #065f46; padding-top: 0.5rem;'>Tahmini Kar: <b style='color:#10b981'>+{fmt_val(profit_ath, curr_symbol)}</b></div>
                     </div>
-                    <div style='width:48%; background:#2d1515; padding:1rem; border-radius:6px; border:1px solid #7f1d1d;'>
-                        <div style='color:#f87171; font-weight:bold; margin-bottom:0.5rem;'>📉 Kötümser Senaryo (52 Hafta Dibi)</div>
-                        Destek Fiyatı: {fmt_val(atl, curr_symbol)} <br>
+                    <div style='width:48%; background:#2d1515; padding:1.5rem; border-radius:8px; border:2px solid #7f1d1d;'>
+                        <div style='color:#f87171; font-weight:bold; margin-bottom:0.75rem; font-size:1.1rem;'>📉 Kötümser Senaryo (52H Dibi Tabanlı)</div>
+                        Destek Fiyatı: {fmt_val(atl_52w, curr_symbol)} <br>
                         Düşüş Riski: <b>-%{pct_atl:.1f}</b> <br>
-                        <div style='margin-top:0.5rem; font-size:1.1rem;'>Tahmini Zarar: <b style='color:#ef4444'>-{fmt_val(loss_atl, curr_symbol)}</b></div>
+                        <div style='margin-top:1rem; font-size:1.3rem; border-top: 1px solid #7f1d1d; padding-top: 0.5rem;'>Tahmini Zarar: <b style='color:#ef4444'>-{fmt_val(loss_atl, curr_symbol)}</b></div>
                     </div>
+                </div>
+
+                <hr style='border-color:#161d2e; margin: 1.5rem 0;'>
+                
+                <h4 style='color:#93c5fd; font-family:"Syne", sans-serif; margin-bottom:1rem;'>Felaket Risk Kontrolü & Kelly Tabanlı Maksimum Pozisyon (v5.0 Abartılmış Kısım)</h4>
+                <div style='display:flex; justify-content:space-between; gap: 1rem;'>
+                    <div style='width:48%; background:#0c1a2e; padding:1.5rem; border-radius:8px; border:2px solid #1e3a5f;'>
+                        <div style='color:#60a5fa; font-weight:bold; margin-bottom:0.75rem; font-size:1.1rem;'>Risk Analizi & Kelly Kriteri Tabanlı Pozisyonlama</div>
+                        Kasa Büyüklüğü % Hesabı (risk_reward_ratio_f = f* = p - q/b)<br>
+                        Abartılmış Kazanma Olasılığı (p): <b>%{win_p*100:.1f}</b> <br>
+                        Kasa % Olarak Önerilen Maksimum Giriş (f*): <b>%{kelly_kasasi*100:.1f}</b> <br>
+                        <div style='margin-top:1rem; font-size:1.1rem;'>Önerilen Maksimum Tutar (TL Bazlı): <b>{fmt_val(max_pos_kasas_tl, curr_symbol)}</b></div>
+                    </div>
+                    <div style='width:48%; background:#2d1515; padding:1.5rem; border-radius:8px; border:2px solid #7f1d1d;'>
+                        <div style='color:#fbbf24; font-weight:bold; margin-bottom:0.75rem; font-size:1.1rem;'>Kuantitatif Hedef Fiyatlar & Zarar Durdur (v5.0 Felaket Analiz)</div>
+                        Volatilite Bazlı Hedefler (Current + n*ATR)<br>
+                        T1_Hedef (Hızlı Kar Al - Kuantitatif Direnç): <b>{fmt_val(t1_hedef, curr_symbol)}</b> <br>
+                        T2_Hedef (Maksimum Beklenti - Kuantitatif Direnç): <b>{fmt_val(t2_hedef, curr_symbol)}</b> <br>
+                        <div style='margin-top:1rem; font-size:1.1rem;'>Kuantitatif Stop_Seviyesi (Kuantitatif Destek): <b style='color:#f87171'>{fmt_val(stop_seviyesi, curr_symbol)}</b></div>
+                    </div>
+                </div>
+
+                <div style='background:#120606; border:1px solid #7f1d1d; border-radius:6px; padding:1.2rem; margin-top:1.5rem; color:#fca5a5; font-size: 0.95rem; font-family:"IBM Plex Mono",monospace;'>
+                    <b style='color:#f87171'>Risk Notu (Abartılmış Felaket Analizi):</b><br>
+                    Kelly Kasa %'si düşükse veya negatifse, kazanma olasılığı risk/ödül oranına göre yetersiz demektir. Bu durumda felaket analiz motoru bu varlığa girmeyi kesinlikle önermez (risk-off durumu).
+                    Zarar Durdur (Kuantitatif Stop) ATR bazlı hesaplanmıştır; fiyatın volatilite alanının dışına çıktığı noktayı stop seviyesi olarak felaket bir analiz yöntemiyle belirler.
+                    Risk/Ödül Oranı (Abartılmış Hedefler/Stop): <b>{risk_reward:.2f}x</b> <br>
+                    %{kelly_kasasi*100:.1f} Kelly oranın negatifse, bu varlığa girmek kasanız için <b style='color:#ef4444'>FELAKET BIR RISK</b> taşımaktadır.
+                    Kazanma Olasılığı Abartılmış (Felaket Analiz v5.0) durumuna göre %{win_p*100:.1f}'dır; olasılık düşükse felaket analizine göre girmeyin.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -511,5 +729,5 @@ with tab_debt:
 #  FOOTER
 # ─────────────────────────────────────────────────────────────
 st.markdown("""<div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:#161d2e;text-align:center;border-top:1px solid #0d1117;padding-top:1.2rem;margin-top:2.5rem;">
-Kişisel Finans Merkezi v4.0 &nbsp;·&nbsp; Eğitim & Planlama Amaçlıdır &nbsp;·&nbsp; Finansal tavsiye değildir
+Kişisel Finans Merkezi v5.0 &nbsp;·&nbsp; Kuantitatif Felaket Analiz Motoru &nbsp;·&nbsp; Eğitim & Planlama Amaçlıdır &nbsp;·&nbsp; Finansal tavsiye değildir
 </div>""", unsafe_allow_html=True)
