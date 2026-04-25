@@ -201,7 +201,7 @@ def get_detailed_data(ticker: str):
 # ==========================================
 # 6. UI RENDER & LOGIC
 # ==========================================
-st.markdown('<div class="app-header">🇹🇷 BIST Terminali & AI Analiz</div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header">&#127481;&#127479; BIST Terminali &amp; AI Analiz</div>', unsafe_allow_html=True)
 
 with st.spinner("Piyasa verileri yükleniyor..."):
     df_market = fetch_market_data()
@@ -217,16 +217,16 @@ down_stocks = len(df_market[df_market["Değişim %"] < 0])
 
 c1, c2, c3, c4 = st.columns([1, 1, 1, 0.5])
 with c1:
-    if st.button(f"📊 Tüm Hisseler\n{total_stocks} Adet", use_container_width=True):
+    if st.button(f"Tum Hisseler | {total_stocks} Adet", use_container_width=True):
         st.session_state.market_filter = "TÜMÜ"
 with c2:
-    if st.button(f"📈 Yükselenler\n{up_stocks} Adet", use_container_width=True):
+    if st.button(f"Yukselenler | {up_stocks} Adet", use_container_width=True):
         st.session_state.market_filter = "YÜKSELENLER"
 with c3:
-    if st.button(f"📉 Düşenler\n{down_stocks} Adet", use_container_width=True):
+    if st.button(f"Dusenler | {down_stocks} Adet", use_container_width=True):
         st.session_state.market_filter = "DÜŞENLER"
 with c4:
-    if st.button("🔄 Yenile\nVerileri Güncelle", use_container_width=True):
+    if st.button("Yenile | Guncelle", use_container_width=True):
         st.cache_data.clear()
         st.session_state.market_filter = "TÜMÜ"
         st.rerun()
@@ -238,7 +238,7 @@ if st.session_state.market_filter == "YÜKSELENLER":
 elif st.session_state.market_filter == "DÜŞENLER":
     df_filtered = df_filtered[df_filtered["Değişim %"] < 0]
 
-st.markdown(f'<div class="section-title">📋 Piyasa Görünümü ({st.session_state.market_filter})</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="section-title">Piyasa Gorunumu ({st.session_state.market_filter})</div>', unsafe_allow_html=True)
 
 def style_df(df):
     styled = df.style.format({"Fiyat (₺)": "₺{:,.2f}", "Değişim %": "{:+.2f}%", "RSI": "{:.1f}"}, na_rep="—")
@@ -254,7 +254,7 @@ def style_df(df):
 st.dataframe(style_df(df_filtered[["Sembol", "Fiyat (₺)", "Değişim %", "RSI", "Aksiyon"]]), use_container_width=True, height=350, hide_index=True)
 
 # --- DETAYLI ANALİZ & BURAK'TAN YORUMLAR ---
-st.markdown('<div class="section-title">🔍 Detaylı Analiz & Yapay Zeka Yorumu</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">Detayli Analiz &amp; Yapay Zeka Yorumu</div>', unsafe_allow_html=True)
 
 selected_symbol = st.selectbox("İncelemek istediğiniz hisseyi seçin:", sorted(bist_symbols), index=bist_symbols.index("HEKTS") if "HEKTS" in bist_symbols else 0)
 selected_ticker = f"{selected_symbol}.IS"
@@ -310,48 +310,61 @@ if selected_ticker:
         c4.markdown(f'<div class="midas-card"><div class="midas-card-title">Kısa Vade Hedef (ATR)</div><div class="midas-card-value" style="color:#00e676;">{fmt_tl(target_price)}</div></div>', unsafe_allow_html=True)
 
         # 3. BURAK'TAN YORUMLAR (AI ANALYSIS - HTML FIX)
-        trend_durumu = "pozitif (yükseliş)" if curr_p > sma50 else "negatif (düşüş)"
-        
-        if rsi_14 > 70:
-            risk_color = "#fca5a5" # Açık kırmızı
-            risk_txt = f"Hisse senedi {rsi_14:.1f} RSI değeri ile aşırı alım bölgesine girmiş durumda. İndikatörler teknik bir yorgunluğa işaret ediyor ve kısa vadede kar satışları görülme ihtimali yüksek."
-            firsat_txt = "Yeni alımlar için risk barındırıyor. Maliyetlenmek için hareketli ortalamalara doğru olası bir geri çekilme (düzeltme) beklenmeli. Mevcut karlar için stop-loss seviyeleri güncellenebilir."
-        elif rsi_14 < 35:
-            risk_color = "#86efac" # Açık yeşil
-            risk_txt = f"RSI {rsi_14:.1f} seviyesinde aşırı satım bölgesine işaret ediyor. Satış baskısının yavaşladığı ve hissenin ucuz fiyatlandığı bir bölgedeyiz."
-            firsat_txt = "Teknik bir dip arayışı mevcut. Buradan gelebilecek yukarı yönlü tepki (rebound) alımları için kademeli maliyetlenme stratejisi izlenebilir."
-        else:
-            risk_color = "#A1A1A6" # Gri
-            risk_txt = f"Hisse senedi {rsi_14:.1f} RSI değeri ile dengeli (nötr) bir seyir izliyor. Aşırı bir fiyatlama veya köpük bulunmuyor."
-            firsat_txt = "Hisse yatay bir konsolidasyon sürecinde olabilir. İşlem hacmi yakından takip edilerek, 50 günlük ortalamanın üzerinde kalıcılık sağlandığı sürece tutma stratejisi benimsenebilir."
+        trend_durumu = "pozitif (yukselis)" if curr_p > sma50 else "negatif (dusus)"
+        sma50_pozisyon = "uzerinde" if curr_p > sma50 else "altinda"
+        curr_p_fmt = fmt_tl(curr_p)
+        sma50_fmt  = fmt_tl(sma50)
 
-        # DİKKAT: unsafe_allow_html=True EKLENDİ (HTML Hatasını Çözen Kısım)
-        st.markdown(f"""
-        <div class="ai-card">
-            <div class="ai-title">🧠 Burak'tan Yorumlar</div>
-            
-            <div class="ai-section">
-                <div class="ai-section-title">📊 Trend Analizi</div>
-                <div class="ai-section-text">
-                    Hissenin mevcut fiyatı ({fmt_tl(curr_p)}), 50 günlük hareketli ortalamasının ({fmt_tl(sma50)}) <b>{'üzerinde' if curr_p > sma50 else 'altında'}</b>. 
-                    Bu durum orta vadeli projeksiyonda <b>{trend_durumu}</b> bir eğilime işaret etmektedir.
-                </div>
-            </div>
-            
-            <div class="ai-section">
-                <div class="ai-section-title">⚠️ Risk Durumu</div>
-                <div class="ai-section-text" style="color: {risk_color};">{risk_txt}</div>
-            </div>
-            
-            <div class="ai-section">
-                <div class="ai-section-title">🎯 Fırsat & Strateji</div>
-                <div class="ai-section-text">{firsat_txt}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        if rsi_14 > 70:
+            risk_color = "#fca5a5"
+            risk_txt   = (f"Hisse senedi {rsi_14:.1f} RSI degeri ile asiri alim bolgesine"
+                          " girmis durumda. Indikatorler teknik bir yorgunluga isaret ediyor"
+                          " ve kisa vadede kar satislari gorilme ihtimali yuksek.")
+            firsat_txt = ("Yeni alimlar icin risk barindiriyor. Maliyetlenmek icin hareketli"
+                          " ortalamalara dogru olasi bir geri cekilme (duzeltme) beklenmeli."
+                          " Mevcut karlar icin stop-loss seviyeleri guncellenebilir.")
+        elif rsi_14 < 35:
+            risk_color = "#86efac"
+            risk_txt   = (f"RSI {rsi_14:.1f} seviyesinde asiri satim bolgesine isaret ediyor."
+                          " Satis baskisinin yavasladigi ve hissenin ucuz fiyatlandigi bir bölgedeyiz.")
+            firsat_txt = ("Teknik bir dip arayisi mevcut. Buradan gelebilecek yukari yonlu"
+                          " tepki (rebound) alimlari icin kademeli maliyetlenme stratejisi izlenebilir.")
+        else:
+            risk_color = "#A1A1A6"
+            risk_txt   = (f"Hisse senedi {rsi_14:.1f} RSI degeri ile dengeli (notr) bir seyir"
+                          " izliyor. Asiri bir fiyatlama veya kopuk bulunmuyor.")
+            firsat_txt = ("Hisse yatay bir konsolidasyon surecinde olabilir. Islem hacmi yakindan"
+                          " takip edilerek, 50 gunluk ortalamanin uzerinde kalicilik saglandigi"
+                          " surece tutma stratejisi benimsenebilir.")
+
+        ai_html = (
+            '<div class="ai-card">'
+            '<div class="ai-title">&#129504; Burak\'tan Yorumlar</div>'
+
+            '<div class="ai-section">'
+            '<div class="ai-section-title">&#128202; Trend Analizi</div>'
+            '<div class="ai-section-text">'
+            f'Hissenin mevcut fiyati ({curr_p_fmt}), 50 gunluk hareketli ortalamasinin'
+            f' ({sma50_fmt}) <b>{sma50_pozisyon}</b>.'
+            f' Bu durum orta vadeli projeksiyonda <b>{trend_durumu}</b> bir egilime isaret etmektedir.'
+            '</div></div>'
+
+            '<div class="ai-section">'
+            f'<div class="ai-section-title">&#9888;&#65039; Risk Durumu</div>'
+            f'<div class="ai-section-text" style="color: {risk_color};">{risk_txt}</div>'
+            '</div>'
+
+            '<div class="ai-section">'
+            '<div class="ai-section-title">&#127919; Firsat &amp; Strateji</div>'
+            f'<div class="ai-section-text">{firsat_txt}</div>'
+            '</div>'
+
+            '</div>'
+        )
+        st.markdown(ai_html, unsafe_allow_html=True)
 
         # 4. HABER SİSTEMİ
-        st.markdown('<div class="section-title">📰 Güncel Haber Akışı</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Guncel Haber Akisi</div>', unsafe_allow_html=True)
         
         if news and len(news) > 0:
             for n in news[:5]:
