@@ -413,4 +413,144 @@ with tab_detail:
                         <a href="{n['link']}" target="_blank" class="news-title">{n['title']}</a>
                         <div class="news-meta"><span>🏢 {n['publisher']}</span><span>🕒 {n['date']}</span></div>
                     </div>""", unsafe_allow_html=True)
-            else
+            else:
+                st.info(f"**{selected_symbol}** için son 24 saate ait doğrulanmış global haber akışı bulunamadı. KAP bildirimlerini inceleyebilirsiniz.")
+
+# ╔══════════════════════════════════════════╗
+# ║  SEKME 3: PORTFÖY SİMÜLATÖRÜ            ║
+# ╚══════════════════════════════════════════╝
+with tab_portfolio:
+    st.markdown('<div class="section-title">Hisse Satın Al</div>', unsafe_allow_html=True)
+
+    pa, pb, pc = st.columns([2, 1, 1])
+    with pa:
+        add_sym = st.selectbox("Hangi hisseyi almak istiyorsun?", sorted(bist_symbols))
+    anlik_fiyat = get_current_price(f"{add_sym}.IS")
+    
+    with pb:
+        st.markdown(f"""
+        <div style="background:#1A1C24; border:1px solid var(--bn-border); border-radius:8px; padding:0.5rem 1rem; margin-top:1.8rem; text-align:center;">
+            <div style="font-size:0.7rem; color:#848E9C;">O ANKİ FİYAT</div>
+            <div style="font-size:1.6rem; font-weight:700; color:#0ECB81;">₺{anlik_fiyat:,.2f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with pc:
+        add_adet = st.number_input("Kaç adet alacaksın?", min_value=1, value=10, step=5)
+        add_maliyet = anlik_fiyat
+        
+    if st.button("Portföye Ekle", type="primary", use_container_width=True):
+        st.session_state.portfolio[add_sym] = {"adet": add_adet, "maliyet": add_maliyet}
+        st.success(f"{add_sym} portföyüne başarıyla eklendi!")
+        st.rerun()
+
+    if st.session_state.portfolio:
+        st.markdown('<div class="section-title">Mevcut Portföyüm & Yapay Zeka Uyarıları</div>', unsafe_allow_html=True)
+        df_market = fetch_market_data()
+        
+        bad_stocks = []
+        for sym, data in st.session_state.portfolio.items():
+            adet, maliyet = data["adet"], data["maliyet"]
+            
+            market_row = df_market[df_market["Sembol"] == sym] if not df_market.empty else pd.DataFrame()
+            if not market_row.empty:
+                guncel_f = market_row.iloc[0]["Fiyat (TL)"]
+                aksiyon = market_row.iloc[0]["Aksiyon"]
+                rsi = market_row.iloc[0]["RSI"]
+                if "SAT" in aksiyon or rsi > 70:
+                    bad_stocks.append({"sym": sym, "aksiyon": aksiyon, "rsi": rsi, "deger": adet * guncel_f})
+            else:
+                guncel_f = get_current_price(f"{sym}.IS")
+                
+            t_guncel, t_yatirim = adet * guncel_f, adet * maliyet
+            kar = t_guncel - t_yatirim
+            kar_pct = (kar / t_yatirim * 100) if t_yatirim > 0 else 0
+            k_c = "#0ECB81" if kar >= 0 else "#F6465D"
+            
+            st.markdown(f"""
+            <div class="bn-card" style="display:flex; justify-content:space-between; align-items:center;">
+                <div><span style="font-size:1.4rem; font-weight:700; color:var(--bn-yellow);">{sym}</span><span style="color:#848E9C; margin-left:1rem;">{adet} Adet | Maliyet: ₺{maliyet:,.2f}</span></div>
+                <div style="text-align:right;"><div style="font-size:1.2rem; font-weight:700; color:#EAECEF;">₺{t_guncel:,.2f}</div><div style="color:{k_c}; font-weight:600;">{'+' if kar>=0 else ''}₺{kar:,.2f} ({'+' if kar_pct>=0 else ''}{kar_pct:.1f}%)</div></div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"Sat ({sym})", key=f"del_{sym}"):
+                del st.session_state.portfolio[sym]
+                st.rerun()
+                
+        # --- AKILLI SWAP (DEĞİŞTİR) ÖNERİSİ ---
+        if bad_stocks and not df_market.empty:
+            st.markdown('<div class="section-title">🔄 Portföy Optimizasyonu (Swap Önerisi)</div>', unsafe_allow_html=True)
+            iyi_hisseler = df_market[(~df_market["Sembol"].isin(st.session_state.portfolio.keys())) & (df_market["Aksiyon"].isin(["GUCLU AL", "AL"])) & (df_market["RSI"] < 50)].sort_values("RSI").head(3)
+            
+            for bad in bad_stocks:
+                st.markdown(f"""
+                <div class="swap-card">
+                    <div style="color:#F6465D; font-weight:700; font-size:1.1rem; margin-bottom:0.5rem;">⚠️ {bad['sym']} Hissesinde Bozulma Tespit Edildi!</div>
+                    <div style="color:#EAECEF; font-size:0.9rem; margin-bottom:1rem;">
+                        <b>{bad['sym']}</b> teknik olarak yorgunluk belirtileri gösteriyor (Sinyal: {bad['aksiyon']}, RSI: {bad['rsi']:.1f}). 
+                        Bunu satarak <b>₺{bad['deger']:,.0f}</b> nakite geçebilir ve yükseliş trendindeki şu hisselere geçiş yapabilirsin:
+                    </div>
+                """, unsafe_allow_html=True)
+                for _, iyi in iyi_hisseler.iterrows():
+                    st.markdown(f"""<div style="background:#161A1E; padding:0.8rem; border-radius:6px; border:1px solid #2B3139; margin-bottom:0.5rem; display:flex; justify-content:space-between;">
+                        <div><span style="color:#0ECB81; font-weight:700;">{iyi['Sembol']}</span> (RSI: {iyi['RSI']:.1f})</div><div style="color:#848E9C;">Sinyal: <span style="color:#0ECB81;">{iyi['Aksiyon']}</span></div>
+                    </div>""", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+# ╔══════════════════════════════════════════╗
+# ║  SEKME 4: AKILLI ÖNERİ MOTORU           ║
+# ╚══════════════════════════════════════════╝
+with tab_recommend:
+    st.markdown('<div class="section-title">🤖 Yapay Zeka Destekli Tarama & Yıl Sonu Simülasyonu</div>', unsafe_allow_html=True)
+
+    r1, r2 = st.columns([1, 1])
+    with r1:
+        butce = st.number_input("Yatırım Bütçen Ne Kadar? (TL)", min_value=1000, value=25000, step=1000)
+    with r2:
+        risk = st.selectbox("Risk Profilin", ["Düşük Risk (Büyük Şirketler)", "Yüksek Risk (Fırsat Hisseleri)"])
+        
+    if st.button("Benim İçin En İyi Hisseleri Bul", type="primary", use_container_width=True):
+        with st.spinner("Piyasa taranıyor ve yıl sonu ihtimalleri hesaplanıyor..."):
+            df_scan = fetch_market_data().copy()
+            if "Düşük" in risk:
+                guvenli = ["AKBNK","GARAN","ISCTR","KCHOL","SAHOL","EREGL","FROTO","THYAO","TCELL","BIMAS","TUPRS"]
+                df_scan = df_scan[df_scan["Sembol"].isin(guvenli)]
+            else:
+                kucuk = ["ASTOR","SMARTG","EUPWR","GESAN","CWENE","YEOTK","GWIND","MIATK","KONTR","ALFAS"]
+                df_scan = df_scan[df_scan["Sembol"].isin(kucuk)]
+                
+            df_scan = df_scan[df_scan["RSI"] < 55].sort_values("RSI", ascending=True).head(3)
+            
+            if df_scan.empty:
+                st.warning("Şu anki piyasa koşullarında bu profile uygun güvenli bir 'AL' fırsatı bulunamadı.")
+            else:
+                hisse_basi_butce = butce / len(df_scan)
+                st.success(f"Yapay Zeka {len(df_scan)} adet fırsat hissesi buldu! Her birine ₺{hisse_basi_butce:,.0f} ayırabilirsin.")
+                
+                for _, row in df_scan.iterrows():
+                    sym, fiyat = row["Sembol"], row["Fiyat (TL)"]
+                    close_hist = get_historical_close(f"{sym}.IS")
+                    fc = yil_sonu_tahmini(close_hist, row["RSI"], row["MACD_H"], fiyat, row["SMA50"])
+                    
+                    st.markdown(f"""
+                    <div style="background:#161A1E; border:1px solid #2B3139; border-left:4px solid #0ECB81; border-radius:8px; padding:1.5rem; margin-bottom:1rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                            <span style="font-size:1.6rem; font-weight:800; color:#EAECEF;">{sym}</span>
+                            <span style="font-size:1.2rem; font-weight:600; color:#0ECB81;">Alım Fiyatı: ₺{fiyat:,.2f}</span>
+                        </div>
+                        <div style="color:#848E9C; font-size:0.9rem; margin-bottom:1rem;">
+                            <b>Neden Önerildi?</b> RSI seviyesi {row['RSI']:.1f} ile oldukça uygun. Teknik indikatörler <b>{row['Aksiyon']}</b> sinyali veriyor.
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if fc:
+                        b_val, bl_val, br_val = (hisse_basi_butce / fiyat) * fc["base"], (hisse_basi_butce / fiyat) * fc["bull"], (hisse_basi_butce / fiyat) * fc["bear"]
+                        st.markdown(f"""
+                        <div style="font-size:0.8rem; color:#848E9C; text-transform:uppercase; margin-bottom:0.5rem;">Yıl Sonuna Kadar Kazanç Olasılıkları (₺{hisse_basi_butce:,.0f} Yatırım İçin)</div>
+                        <div style="display:flex; gap:1rem;">
+                            <div class="forecast-card" style="flex:1;"><div style="color:#0ECB81; font-size:0.8rem;">İyimser Senaryo</div><div style="font-size:1.3rem; font-weight:700; color:#EAECEF;">₺{bl_val:,.0f}</div></div>
+                            <div class="forecast-card base" style="flex:1;"><div style="color:#1E90FF; font-size:0.8rem;">Ortalama Beklenti</div><div style="font-size:1.3rem; font-weight:700; color:#EAECEF;">₺{b_val:,.0f}</div></div>
+                            <div class="forecast-card bear" style="flex:1;"><div style="color:#F6465D; font-size:0.8rem;">Kötü Senaryo</div><div style="font-size:1.3rem; font-weight:700; color:#EAECEF;">₺{br_val:,.0f}</div></div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
