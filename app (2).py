@@ -294,18 +294,37 @@ label { font-family:'IBM Plex Mono',monospace !important; font-size:0.72rem !imp
 # 3. BIST SEMBOL LİSTESİ
 # ==========================================
 bist_symbols = [
-    "AKBNK","GARAN","ISCTR","YKBNK","VAKBN","HALKB","ALBRK","SKBNK","TSKB","KLNMA",
-    "KCHOL","SAHOL","DOHOL","ALARK","ENKAI","AGHOL","TKFEN","NTHOL","GLYHO","POLHO",
-    "EREGL","KRDMD","TUPRS","PETKM","SASA","HEKTS","GUBRF","SISE","ARCLK","VESTL",
-    "BRISA","GOODY","CIMSA","AKCNS","OYAKC","NUHCM","BTCIM","AFYON","GOLTS","BSOKE",
+    # Bankacılık
+    "AKBNK","GARAN","ISCTR","YKBNK","VAKBN","HALKB","ALBRK","SKBNK","TSKB","KLNMA","QNBFB",
+    # Holding
+    "KCHOL","SAHOL","DOHOL","ALARK","ENKAI","AGHOL","TKFEN","NTHOL","GLYHO","POLHO","TAVHL",
+    # Demir / Metal / Petrokimya
+    "EREGL","KRDMD","TUPRS","PETKM","SASA","HEKTS","GUBRF","KOZAL","KOZAA","IPEKE","ISDMR",
+    # Cam / Çimento
+    "SISE","CIMSA","AKCNS","OYAKC","NUHCM","BTCIM","AFYON","GOLTS","BSOKE","ADANA","MRDIN","ANACM","TRKCM",
+    # Beyaz Eşya / Elektronik
+    "ARCLK","VESTL","BRISA","GOODY","SARKY","SODA","BAGFS",
+    # Otomotiv / Makine
     "FROTO","TOASO","DOAS","OTKAR","KARSN","ASUZU","TMSN","TTRAK",
-    "THYAO","PGSUS","TAVHL","CLEBI","DOCO",
-    "BIMAS","MGROS","SOKM","AEFES","CCOLA","ULKER","TATGD","TUKAS","PNSUT","PETUN","KERVT",
-    "TCELL","TTKOM","ASELS","ASTOR","KONTR","ALFAS","ENJSA","AKSEN","ODAS","SMARTG",
-    "EUPWR","MIATK","GESAN","CWENE","YEOTK","GWIND","NATEN","MAGEN","AYDEM","CANTE",
+    # Havacılık / Lojistik
+    "THYAO","PGSUS","CLEBI","USAS","HAVA","ULUSE",
+    # Perakende / Gıda / İçecek
+    "BIMAS","MGROS","SOKM","AEFES","CCOLA","ULKER","TATGD","TUKAS","PNSUT","PETUN","KERVT","BANVT",
+    # Teknoloji / Telekom / Yazılım
+    "TCELL","TTKOM","ASELS","ASTOR","KONTR","ALFAS","KAREL","INDES","NETAS","ARENA","LOGO","DESPC","MIATK",
+    # Enerji / Yenilenebilir
+    "ENJSA","AKSEN","ODAS","SMARTG","EUPWR","GESAN","CWENE","YEOTK","GWIND","NATEN","MAGEN","AYDEM","CANTE","ZOREN","AYEN","AKSA",
+    # GYO
     "EKGYO","ISGYO","TRGYO","HLGYO","VKGYO","DZGYO","SNGYO","ZRGYO","PSGYO","RYGYO",
-    "KORDS","VESBE","AYGAZ","AYEN","ZOREN","AKSA","DEVA","SELEC","LKMNH","RTALB"
+    # Savunma
+    "ROBIT","HATEK","FLAP","OSAS",
+    # İlaç / Kimya
+    "DEVA","SELEC","LKMNH","RTALB","ECILC","KORDS","VESBE","AYGAZ","ALKIM",
+    # Küçük / Büyüyen - Fırsat Hisseleri
+    "MAVI","ORGE","OSMEN","KLMSN","ACSEL","PGMT","KRPLAS","ANGEN","BIOEN","HUBVC","MERIT","INTEM",
+    "SNKRN","GEREL","PKART","KCAER","KGYO","MIPAZ","BMEKS",
 ]
+bist_symbols = list(dict.fromkeys(bist_symbols))  # tekrarsiz
 TICKERS_BIST = {f"{sym}.IS": sym for sym in bist_symbols}
 
 # ==========================================
@@ -888,285 +907,559 @@ with tab_detail:
             </div>""", unsafe_allow_html=True)
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 3: PORTFÖY SIMÜLATÖRÜ            ║
+# ║  SEKME 3: PORTFÖY + AKILLI ÖNERİ       ║
 # ╚══════════════════════════════════════════╝
 with tab_portfolio:
-    st.markdown('<div class="section-title">Portfoy Simulatoru — Yil Sonu Tahmini</div>',
-                unsafe_allow_html=True)
 
-    # ── Portföy Adı ─────────────────────────────────────────
-    pf_name = st.text_input("Portfoy Adi", value=st.session_state.portfolio_name)
-    st.session_state.portfolio_name = pf_name
+    pf_tab1, pf_tab2 = st.tabs(["  Portfoyum  ", "  Akilli Oneri Motoru  "])
 
-    # ── Hisse Ekle ──────────────────────────────────────────
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    pa, pb, pc, pd_col = st.columns([2, 1.5, 1.5, 1])
-    with pa:
-        add_sym = st.selectbox("Hisse Ekle", sorted(bist_symbols), key="add_sym")
-    with pb:
-        add_adet = st.number_input("Adet", min_value=1, value=100, step=10, key="add_adet")
-    with pc:
-        add_maliyet = st.number_input("Maliyet Fiyati (TL)", min_value=0.01, value=10.0,
-                                      step=0.5, format="%.2f", key="add_maliyet")
-    with pd_col:
-        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-        if st.button("Ekle", use_container_width=True, type="primary"):
-            st.session_state.portfolio[add_sym] = {
-                "adet": add_adet, "maliyet": add_maliyet
-            }
-            st.success(f"{add_sym} portfoya eklendi!")
-            st.rerun()
+    # ════════════════════════════════════════
+    #  ALT SEKME 1: PORTFÖYÜM
+    # ════════════════════════════════════════
+    with pf_tab1:
+        st.markdown('<div class="section-title">Portfoyume Hisse Ekle</div>', unsafe_allow_html=True)
 
-    if not st.session_state.portfolio:
+        # Bilgi kutusu
         st.markdown("""
-        <div class="bn-card" style="text-align:center;padding:3rem;">
-            <div style="font-size:2rem;margin-bottom:1rem;">📂</div>
-            <div style="color:#848E9C;font-size:0.9rem;">
-                Portfoyunuz bos. Yukaridan hisse ekleyerek baslayin.
-            </div>
+        <div style="background:#1A1C24;border:1px solid #2B3139;border-left:3px solid #F0B90B;
+        border-radius:6px;padding:1rem 1.2rem;margin-bottom:1rem;font-size:0.85rem;color:#848E9C;">
+        <b style="color:#F0B90B;">Nasil kullanilir?</b><br>
+        1. Asagidan hisse sec<br>
+        2. Kac adet aldigini gir (ornegin: 50 adet)<br>
+        3. O hisseyi kac TL'ye aldigini gir (ornegin: 45,50 TL'ye aldim)<br>
+        4. "Portfoya Ekle" butonuna tikla
         </div>""", unsafe_allow_html=True)
-    else:
-        # ── Portföy Hesapla ──────────────────────────────────
-        total_maliyet   = 0.0
-        total_guncel    = 0.0
-        total_bull      = 0.0
-        total_base      = 0.0
-        total_bear      = 0.0
-        portfolio_rows  = []
-        sil_listesi     = []
 
-        progress_bar = st.progress(0, text="Portfoy hesaplaniyor...")
-        symbols_list = list(st.session_state.portfolio.keys())
+        # Hisse seçimi + anlık fiyat göster
+        pa, pb = st.columns([3, 2])
+        with pa:
+            add_sym = st.selectbox(
+                "Hangi hisseyi almak istiyorsun?",
+                sorted(bist_symbols), key="add_sym")
+        with pb:
+            # Anlık fiyatı çek ve göster
+            preview_price = get_current_price(f"{add_sym}.IS")
+            if preview_price > 0:
+                st.markdown(f"""
+                <div style="background:#0D1F12;border:1px solid #1B4332;border-radius:6px;
+                padding:0.8rem 1rem;margin-top:1.8rem;">
+                    <div style="font-size:0.65rem;color:#848E9C;text-transform:uppercase;
+                    letter-spacing:0.08em;margin-bottom:0.2rem;">{add_sym} Guncel Fiyat</div>
+                    <div style="font-size:1.4rem;font-weight:700;color:#0ECB81;">
+                        TL {preview_price:,.2f}
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
-        for i, sym in enumerate(symbols_list):
-            progress_bar.progress((i+1)/len(symbols_list),
-                                  text=f"Analiz ediliyor: {sym}...")
-            data   = st.session_state.portfolio[sym]
-            ticker = f"{sym}.IS"
+        pc_col, pd_col, pe_col = st.columns([2, 2, 1])
+        with pc_col:
+            add_adet = st.number_input(
+                "Kac adet aldın?",
+                min_value=1, value=10, step=5, key="add_adet")
+        with pd_col:
+            add_maliyet = st.number_input(
+                "Kac TL'ye aldin? (1 hisse fiyati)",
+                min_value=0.01,
+                value=round(preview_price, 2) if preview_price > 0 else 10.0,
+                step=0.5, format="%.2f", key="add_maliyet",
+                help="Hisseyi hangi fiyattan satin aldin? Simdi mi aldiysan guncel fiyat otomatik geldi.")
 
-            try:
-                _, hist_pf, _ = get_detailed_data(ticker)
-                if hist_pf.empty:
-                    sil_listesi.append(sym)
+        # Anlık hesap göster
+        toplam_yatirim = add_adet * add_maliyet
+        guncel_toplam  = add_adet * preview_price if preview_price > 0 else 0
+        fark           = guncel_toplam - toplam_yatirim
+
+        st.markdown(f"""
+        <div style="background:#1E2329;border:1px solid #2B3139;border-radius:6px;
+        padding:0.9rem 1.2rem;margin:0.8rem 0;display:flex;gap:2rem;flex-wrap:wrap;">
+            <div>
+                <div style="font-size:0.65rem;color:#848E9C;text-transform:uppercase;">Toplam Yatirim</div>
+                <div style="font-size:1.1rem;font-weight:700;color:#EAECEF;">TL {toplam_yatirim:,.2f}</div>
+            </div>
+            <div>
+                <div style="font-size:0.65rem;color:#848E9C;text-transform:uppercase;">{add_adet} Adet x TL {add_maliyet:,.2f}</div>
+                <div style="font-size:0.85rem;color:#848E9C;">= Toplam boyle hesaplandı</div>
+            </div>
+            {'<div><div style="font-size:0.65rem;color:#848E9C;text-transform:uppercase;">Simdi Degeri</div><div style="font-size:1.1rem;font-weight:700;color:' + ("#0ECB81" if fark>=0 else "#F6465D") + ';">TL ' + f"{guncel_toplam:,.2f}" + '</div></div>' if preview_price > 0 else ""}
+        </div>""", unsafe_allow_html=True)
+
+        with pe_col:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("Portfoya Ekle", use_container_width=True, type="primary"):
+                st.session_state.portfolio[add_sym] = {
+                    "adet": add_adet, "maliyet": add_maliyet
+                }
+                st.success(f"{add_sym} portfoyunuza eklendi!")
+                st.rerun()
+
+        # ── Portföy Boşsa ──────────────────────────────────
+        if not st.session_state.portfolio:
+            st.markdown("""
+            <div class="bn-card" style="text-align:center;padding:3rem;margin-top:1rem;">
+                <div style="font-size:2.5rem;margin-bottom:0.8rem;">📂</div>
+                <div style="color:#848E9C;font-size:0.9rem;">
+                    Portfoyunuz bos.<br>Yukaridan hisse ekleyerek baslayin.
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+        else:
+            # ── Portföy Hesapla ──────────────────────────────
+            st.markdown('<div class="section-title">Portfoy Ozeti</div>', unsafe_allow_html=True)
+
+            total_yatirim  = 0.0
+            total_guncel   = 0.0
+            total_bull     = 0.0
+            total_base     = 0.0
+            total_bear     = 0.0
+            portfolio_rows = []
+
+            pbar = st.progress(0, text="Fiyatlar guncelleniyor...")
+            syms = list(st.session_state.portfolio.keys())
+
+            for i, sym in enumerate(syms):
+                pbar.progress((i+1)/len(syms), text=f"Analiz: {sym}...")
+                data   = st.session_state.portfolio[sym]
+                ticker = f"{sym}.IS"
+                try:
+                    _, hist_pf, _ = get_detailed_data(ticker)
+                    if hist_pf.empty: continue
+
+                    close_pf  = hist_pf["Close"].squeeze()
+                    curr_p_pf = float(close_pf.iloc[-1])
+                    rsi_pf    = compute_rsi(close_pf)
+                    _, _, macd_h_pf = compute_macd(close_pf)
+                    sma50_pf  = float(close_pf.rolling(50).mean().iloc[-1]) if len(close_pf)>=50 else curr_p_pf
+                    fc = yil_sonu_tahmini(close_pf, rsi_pf, macd_h_pf, curr_p_pf, sma50_pf, np.nan)
+
+                    adet          = data["adet"]
+                    maliyet       = data["maliyet"]
+                    t_yatirim     = adet * maliyet
+                    t_guncel      = adet * curr_p_pf
+                    kar           = t_guncel - t_yatirim
+                    kar_pct       = (kar / t_yatirim * 100) if t_yatirim > 0 else 0
+
+                    if fc:
+                        bull_val = adet * fc["bull"]
+                        base_val = adet * fc["base"]
+                        bear_val = adet * fc["bear"]
+                        bull_ret = (fc["bull"] - curr_p_pf) / curr_p_pf * 100
+                        base_ret = (fc["base"] - curr_p_pf) / curr_p_pf * 100
+                        bear_ret = (fc["bear"] - curr_p_pf) / curr_p_pf * 100
+                    else:
+                        bull_val = base_val = bear_val = t_guncel
+                        bull_ret = base_ret = bear_ret = 0.0
+
+                    total_yatirim += t_yatirim
+                    total_guncel  += t_guncel
+                    total_bull    += bull_val
+                    total_base    += base_val
+                    total_bear    += bear_val
+
+                    portfolio_rows.append({
+                        "sym": sym, "adet": adet, "maliyet": maliyet,
+                        "curr_p": curr_p_pf,
+                        "t_yatirim": t_yatirim, "t_guncel": t_guncel,
+                        "kar": kar, "kar_pct": kar_pct,
+                        "bull_val": bull_val, "base_val": base_val, "bear_val": bear_val,
+                        "bull_ret": bull_ret, "base_ret": base_ret, "bear_ret": bear_ret,
+                        "rsi": rsi_pf,
+                    })
+                except:
                     continue
+            pbar.empty()
 
-                close_pf = hist_pf["Close"].squeeze()
-                curr_p_pf = float(close_pf.iloc[-1])
-                rsi_pf    = compute_rsi(close_pf)
-                _, _, macd_h_pf = compute_macd(close_pf)
-                sma50_pf  = float(close_pf.rolling(50).mean().iloc[-1]) if len(close_pf)>=50 else curr_p_pf
-                pe_pf     = np.nan
+            if not portfolio_rows:
+                st.warning("Hisseler icin veri cekilemedi.")
+            else:
+                # ── Özet Kartlar ──────────────────────────────
+                pnl       = total_guncel - total_yatirim
+                pnl_pct   = (pnl / total_yatirim * 100) if total_yatirim > 0 else 0
+                pnl_cls   = "green" if pnl >= 0 else "red"
+                pnl_sign  = "+" if pnl >= 0 else ""
 
-                fc = yil_sonu_tahmini(close_pf, rsi_pf, macd_h_pf, curr_p_pf, sma50_pf, pe_pf)
+                def kcard(col, label, value, cls=""):
+                    col.markdown(
+                        f'<div class="bn-card"><div class="bn-card-label">{label}</div>'
+                        f'<div class="bn-card-value {cls}">{value}</div></div>',
+                        unsafe_allow_html=True)
 
-                adet     = data["adet"]
-                maliyet  = data["maliyet"]
-                toplam_maliyet = adet * maliyet
-                toplam_guncel  = adet * curr_p_pf
-                karpf          = toplam_guncel - toplam_maliyet
-                karpct         = (karpf / toplam_maliyet * 100) if toplam_maliyet > 0 else 0
+                k1, k2, k3, k4 = st.columns(4)
+                kcard(k1, "Toplam Yatirim", f"TL {total_yatirim:,.0f}")
+                kcard(k2, "Simdi Degeri",   f"TL {total_guncel:,.0f}")
+                kcard(k3, "Kar / Zarar",
+                      f"{pnl_sign}TL {abs(pnl):,.0f}  ({pnl_sign}{pnl_pct:.1f}%)", pnl_cls)
+                kcard(k4, "Portfoydeki Hisse", str(len(portfolio_rows)))
 
-                if fc:
-                    bull_val = adet * fc["bull"]
-                    base_val = adet * fc["base"]
-                    bear_val = adet * fc["bear"]
-                    bull_ret = (fc["bull"] - curr_p_pf) / curr_p_pf * 100
-                    base_ret = (fc["base"] - curr_p_pf) / curr_p_pf * 100
-                    bear_ret = (fc["bear"] - curr_p_pf) / curr_p_pf * 100
-                    score    = fc["score"]
-                else:
-                    bull_val = base_val = bear_val = toplam_guncel
-                    bull_ret = base_ret = bear_ret = 0.0
-                    score    = 0.0
+                # ── Yıl Sonu Tahmin ────────────────────────────
+                st.markdown('<div class="section-title">Yil Sonu Tahmini (2025 Sonu)</div>',
+                            unsafe_allow_html=True)
 
-                total_maliyet  += toplam_maliyet
-                total_guncel   += toplam_guncel
-                total_bull     += bull_val
-                total_base     += base_val
-                total_bear     += bear_val
+                bull_k = total_bull - total_yatirim
+                base_k = total_base - total_yatirim
+                bear_k = total_bear - total_yatirim
 
-                portfolio_rows.append({
-                    "sym": sym, "adet": adet, "maliyet": maliyet,
-                    "curr_p": curr_p_pf,
-                    "toplam_maliyet": toplam_maliyet,
-                    "toplam_guncel": toplam_guncel,
-                    "kar": karpf, "kar_pct": karpct,
-                    "bull_val": bull_val, "base_val": base_val, "bear_val": bear_val,
-                    "bull_ret": bull_ret, "base_ret": base_ret, "bear_ret": bear_ret,
-                    "rsi": rsi_pf, "score": score,
-                })
-            except:
-                continue
+                y1, y2, y3 = st.columns(3)
+                y1.markdown(f"""
+                <div class="forecast-card">
+                    <div class="bn-card-label">En Iyi Senaryo</div>
+                    <div style="font-size:0.75rem;color:#848E9C;margin-bottom:0.5rem;">
+                        Her sey yolunda giderse portfoyun yil sonunda:
+                    </div>
+                    <div style="font-size:1.8rem;font-weight:700;color:#0ECB81;">
+                        TL {total_bull:,.0f}
+                    </div>
+                    <div style="color:#0ECB81;font-size:0.9rem;margin-top:0.3rem;">
+                        +TL {bull_k:,.0f} kazanc
+                        ({(total_bull/total_yatirim-1)*100:+.1f}%)
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
-        progress_bar.empty()
+                y2.markdown(f"""
+                <div class="forecast-card base">
+                    <div class="bn-card-label">Ortalama Senaryo</div>
+                    <div style="font-size:0.75rem;color:#848E9C;margin-bottom:0.5rem;">
+                        Normal gidisatta portfoyun yil sonunda:
+                    </div>
+                    <div style="font-size:1.8rem;font-weight:700;color:#1E90FF;">
+                        TL {total_base:,.0f}
+                    </div>
+                    <div style="color:#1E90FF;font-size:0.9rem;margin-top:0.3rem;">
+                        {'+' if base_k>=0 else ''}TL {base_k:,.0f}
+                        ({(total_base/total_yatirim-1)*100:+.1f}%)
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
-        # ── Özet KPI'lar ──────────────────────────────────────
-        pnl_total     = total_guncel - total_maliyet
-        pnl_pct       = (pnl_total / total_maliyet * 100) if total_maliyet > 0 else 0
-        bull_kazanc   = total_bull - total_maliyet
-        base_kazanc   = total_base - total_maliyet
-        bear_kazanc   = total_bear - total_maliyet
+                y3.markdown(f"""
+                <div class="forecast-card bear">
+                    <div class="bn-card-label">Kotü Senaryo</div>
+                    <div style="font-size:0.75rem;color:#848E9C;margin-bottom:0.5rem;">
+                        Piyasa duserse portfoyun yil sonunda:
+                    </div>
+                    <div style="font-size:1.8rem;font-weight:700;color:#F6465D;">
+                        TL {total_bear:,.0f}
+                    </div>
+                    <div style="color:#F6465D;font-size:0.9rem;margin-top:0.3rem;">
+                        {'+' if bear_k>=0 else ''}TL {bear_k:,.0f}
+                        ({(total_bear/total_yatirim-1)*100:+.1f}%)
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
-        st.markdown(f"<div style='margin:1rem 0 0.5rem 0;font-size:1.1rem;font-weight:700;color:#EAECEF;'>{pf_name}</div>",
+                # ── Hisse Hisse Satır Tablosu ──────────────────
+                st.markdown('<div class="section-title">Hisselerim</div>', unsafe_allow_html=True)
+
+                for row in portfolio_rows:
+                    kc    = "#0ECB81" if row["kar"] >= 0 else "#F6465D"
+                    ks    = "+" if row["kar"] >= 0 else ""
+                    rc    = "#0ECB81" if pd.notna(row["rsi"]) and row["rsi"] < 40 else \
+                            "#F6465D" if pd.notna(row["rsi"]) and row["rsi"] > 65 else "#848E9C"
+                    fark_fiyat = row["curr_p"] - row["maliyet"]
+                    fark_s    = "+" if fark_fiyat >= 0 else ""
+                    fark_c    = "#0ECB81" if fark_fiyat >= 0 else "#F6465D"
+
+                    hc1, hc2, hc3 = st.columns([3, 4, 1])
+                    with hc1:
+                        st.markdown(f"""
+                        <div class="portfolio-card">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div class="portfolio-ticker" style="font-size:1.2rem;">{row['sym']}</div>
+                                <div style="font-size:0.7rem;color:#848E9C;">{row['adet']} adet</div>
+                            </div>
+                            <div style="margin-top:0.6rem;display:flex;gap:1.5rem;">
+                                <div>
+                                    <div style="font-size:0.62rem;color:#848E9C;">Alış Fiyatın</div>
+                                    <div style="font-size:0.9rem;color:#EAECEF;font-weight:600;">TL {row['maliyet']:,.2f}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.62rem;color:#848E9C;">Simdi</div>
+                                    <div style="font-size:0.9rem;color:#EAECEF;font-weight:600;">TL {row['curr_p']:,.2f}</div>
+                                    <div style="font-size:0.75rem;color:{fark_c};">{fark_s}TL {abs(fark_fiyat):,.2f}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.62rem;color:#848E9C;">Toplam Yatirim</div>
+                                    <div style="font-size:0.9rem;color:#EAECEF;font-weight:600;">TL {row['t_yatirim']:,.0f}</div>
+                                </div>
+                            </div>
+                            <div style="margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid #2B3139;">
+                                <span style="color:{kc};font-weight:700;font-size:1rem;">
+                                    {ks}TL {abs(row['kar']):,.0f}
+                                </span>
+                                <span style="color:{kc};font-size:0.85rem;margin-left:0.4rem;">
+                                    ({ks}{row['kar_pct']:.1f}%)
+                                </span>
+                                <span style="float:right;font-size:0.72rem;color:{rc};">RSI {row['rsi']:.0f}</span>
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+
+                    with hc2:
+                        st.markdown(f"""
+                        <div class="portfolio-card">
+                            <div style="font-size:0.65rem;color:#848E9C;margin-bottom:0.7rem;
+                            text-transform:uppercase;letter-spacing:0.08em;">
+                                Yil Sonu Toplam Deger Tahmini ({row['adet']} adet icin)
+                            </div>
+                            <div style="display:flex;gap:0;width:100%;">
+                                <div style="flex:1;text-align:center;padding:0.6rem;
+                                background:#0D2E1A;border-radius:6px 0 0 6px;border:1px solid #1B4332;">
+                                    <div style="font-size:0.6rem;color:#848E9C;margin-bottom:0.2rem;">EN IYI</div>
+                                    <div style="font-size:1rem;font-weight:700;color:#0ECB81;">
+                                        TL {row['bull_val']:,.0f}
+                                    </div>
+                                    <div style="font-size:0.72rem;color:#0ECB81;">+{row['bull_ret']:.0f}%</div>
+                                </div>
+                                <div style="flex:1;text-align:center;padding:0.6rem;
+                                background:#0D1525;border:1px solid #1A3A6B;border-left:none;border-right:none;">
+                                    <div style="font-size:0.6rem;color:#848E9C;margin-bottom:0.2rem;">ORTALAMA</div>
+                                    <div style="font-size:1rem;font-weight:700;color:#1E90FF;">
+                                        TL {row['base_val']:,.0f}
+                                    </div>
+                                    <div style="font-size:0.72rem;color:#1E90FF;">{row['base_ret']:+.0f}%</div>
+                                </div>
+                                <div style="flex:1;text-align:center;padding:0.6rem;
+                                background:#1A0A0D;border-radius:0 6px 6px 0;border:1px solid #4A1020;">
+                                    <div style="font-size:0.6rem;color:#848E9C;margin-bottom:0.2rem;">KOTU</div>
+                                    <div style="font-size:1rem;font-weight:700;color:#F6465D;">
+                                        TL {row['bear_val']:,.0f}
+                                    </div>
+                                    <div style="font-size:0.72rem;color:#F6465D;">{row['bear_ret']:+.0f}%</div>
+                                </div>
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+
+                    with hc3:
+                        st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+                        if st.button("Sil", key=f"del_{row['sym']}", use_container_width=True):
+                            del st.session_state.portfolio[row["sym"]]
+                            st.rerun()
+
+                # ── Pasta Grafik ───────────────────────────────
+                if len(portfolio_rows) > 1:
+                    st.markdown('<div class="section-title">Dagılım</div>', unsafe_allow_html=True)
+                    labels = [r["sym"] for r in portfolio_rows]
+                    values = [r["t_guncel"] for r in portfolio_rows]
+                    colors = ["#F0B90B","#0ECB81","#1E90FF","#F6465D","#C084FC",
+                              "#FB923C","#34D399","#60A5FA","#F472B6","#A3E635"]
+                    fig_pie = go.Figure(go.Pie(
+                        labels=labels, values=values, hole=0.6,
+                        marker=dict(colors=colors[:len(labels)],
+                                    line=dict(color="#0B0E11", width=2)),
+                        textinfo="label+percent",
+                        textfont=dict(family="IBM Plex Mono", size=11, color="#EAECEF"),
+                        hovertemplate="<b>%{label}</b><br>TL %{value:,.0f}<br>%{percent}<extra></extra>",
+                    ))
+                    fig_pie.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        legend=dict(font=dict(family="IBM Plex Mono", color="#848E9C", size=10)),
+                        margin=dict(t=20,b=20,l=20,r=20), height=300,
+                        annotations=[dict(
+                            text=f"TL {total_guncel:,.0f}",
+                            font=dict(size=13, color="#EAECEF", family="IBM Plex Sans"),
+                            showarrow=False)],
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+    # ════════════════════════════════════════
+    #  ALT SEKME 2: AKILLI ÖNERİ MOTORU
+    # ════════════════════════════════════════
+    with pf_tab2:
+        st.markdown('<div class="section-title">Akilli Oneri Motoru — Butcene gore hisse onerelim</div>',
                     unsafe_allow_html=True)
 
-        k1, k2, k3, k4 = st.columns(4)
-        def kcard(col, label, value, cls=""):
-            col.markdown(
-                f'<div class="bn-card"><div class="bn-card-label">{label}</div>'
-                f'<div class="bn-card-value {cls}">{value}</div></div>',
-                unsafe_allow_html=True)
-
-        kcard(k1, "Toplam Maliyet",   fmt_tl(total_maliyet))
-        kcard(k2, "Guncel Deger",     fmt_tl(total_guncel))
-        pnl_cls = "green" if pnl_total >= 0 else "red"
-        kcard(k3, "Kar / Zarar",
-              f"{'+' if pnl_total>=0 else ''}{fmt_tl(pnl_total)} ({'+' if pnl_pct>=0 else ''}{pnl_pct:.1f}%)",
-              pnl_cls)
-        kcard(k4, "Hisse Sayisi",     str(len(portfolio_rows)))
-
-        # ── Yıl Sonu Tahmin KPI'ları ─────────────────────────
-        st.markdown('<div class="section-title">Yil Sonu Portfoy Tahmini</div>', unsafe_allow_html=True)
-
-        y1, y2, y3 = st.columns(3)
-        bull_cls = "green" if bull_kazanc >= 0 else "red"
-        base_cls = "green" if base_kazanc >= 0 else "red"
-        bear_cls = "green" if bear_kazanc >= 0 else "red"
-
-        y1.markdown(f"""
-        <div class="forecast-card">
-            <div class="bn-card-label">Iyimser Senaryo (Bull)</div>
-            <div class="bn-card-value green" style="font-size:1.6rem;">{fmt_tl(total_bull)}</div>
-            <div style="color:#0ECB81;font-size:0.9rem;margin-top:0.3rem;">
-                {'+' if bull_kazanc>=0 else ''}{fmt_tl(bull_kazanc)}
-                ({'+' if (total_bull/total_maliyet-1)*100>=0 else ''}{(total_bull/total_maliyet-1)*100:.1f}%)
-            </div>
+        st.markdown("""
+        <div style="background:#1A1C24;border:1px solid #2B3139;border-left:3px solid #0ECB81;
+        border-radius:6px;padding:1rem 1.2rem;margin-bottom:1.2rem;font-size:0.85rem;color:#848E9C;">
+        <b style="color:#0ECB81;">Nasil calisir?</b><br>
+        Elindeki parayı gir, risk tercihin sec. Sistem BIST'teki tüm hisseleri tarayarak
+        teknik skor, RSI, MACD ve momentum verilerini analiz eder; senin için en uygun
+        hisseleri secer ve nasıl dagitman gerektigini gosterir.
         </div>""", unsafe_allow_html=True)
 
-        y2.markdown(f"""
-        <div class="forecast-card base">
-            <div class="bn-card-label">Baz Senaryo (Median)</div>
-            <div class="bn-card-value" style="font-size:1.6rem;color:#1E90FF;">{fmt_tl(total_base)}</div>
-            <div style="color:#1E90FF;font-size:0.9rem;margin-top:0.3rem;">
-                {'+' if base_kazanc>=0 else ''}{fmt_tl(base_kazanc)}
-                ({'+' if (total_base/total_maliyet-1)*100>=0 else ''}{(total_base/total_maliyet-1)*100:.1f}%)
-            </div>
-        </div>""", unsafe_allow_html=True)
+        on1, on2, on3 = st.columns([2, 2, 1])
+        with on1:
+            butce = st.number_input(
+                "Elindeki para ne kadar? (TL)",
+                min_value=1000, max_value=10_000_000,
+                value=10_000, step=1000, format="%d")
+        with on2:
+            risk_profil = st.selectbox(
+                "Risk toleransin nedir?",
+                ["Dusuk Risk — Buyuk ve guclu sirketler",
+                 "Orta Risk — Karma portfoy",
+                 "Yuksek Risk — Yukselen kucuk hisseler"])
+        with on3:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            oneri_baslat = st.button("Oneri Olustur", type="primary", use_container_width=True)
 
-        y3.markdown(f"""
-        <div class="forecast-card bear">
-            <div class="bn-card-label">Karamsar Senaryo (Bear)</div>
-            <div class="bn-card-value red" style="font-size:1.6rem;">{fmt_tl(total_bear)}</div>
-            <div style="color:#F6465D;font-size:0.9rem;margin-top:0.3rem;">
-                {'+' if bear_kazanc>=0 else ''}{fmt_tl(bear_kazanc)}
-                ({'+' if (total_bear/total_maliyet-1)*100>=0 else ''}{(total_bear/total_maliyet-1)*100:.1f}%)
-            </div>
-        </div>""", unsafe_allow_html=True)
+        if oneri_baslat:
+            with st.spinner("Tum hisseler taranıyor, en iyi firsatlar hesaplaniyor..."):
 
-        # ── Hisse Hisse Detay ─────────────────────────────────
-        st.markdown('<div class="section-title">Hisse Detaylari</div>', unsafe_allow_html=True)
+                # Piyasa verisini kullan (zaten cacheli)
+                df_scan = fetch_market_data().copy()
 
-        for row in portfolio_rows:
-            kar_cls = "#0ECB81" if row["kar"] >= 0 else "#F6465D"
-            kar_sign = "+" if row["kar"] >= 0 else ""
-            rsi_col = "#0ECB81" if pd.notna(row["rsi"]) and row["rsi"] < 40 else \
-                      "#F6465D" if pd.notna(row["rsi"]) and row["rsi"] > 65 else "#848E9C"
+                if df_scan.empty:
+                    st.error("Veri cekilemedi.")
+                else:
+                    # Risk profiline gore filtre
+                    if "Dusuk" in risk_profil:
+                        # Büyük, güvenilir hisseler — listedeki ilk 40 (bankalar, holdinglar vb)
+                        guvenli = ["AKBNK","GARAN","ISCTR","YKBNK","KCHOL","SAHOL","EREGL",
+                                   "FROTO","TOASO","THYAO","TCELL","BIMAS","ARCLK","SISE",
+                                   "TUPRS","ENKAI","AKSEN","TTKOM","ALARK","CCOLA"]
+                        df_scan = df_scan[df_scan["Sembol"].isin(guvenli)]
+                    elif "Yuksek" in risk_profil:
+                        # Küçük / büyüyen — düşük RSI, yükselen hisseler
+                        kucuk = ["ASTOR","SMARTG","EUPWR","GESAN","CWENE","YEOTK","GWIND",
+                                 "MAGEN","ROBIT","HATEK","MAVI","ORGE","OSMEN","KLMSN",
+                                 "ACSEL","PGMT","ANGEN","BIOEN","HUBVC","MERIT","SNKRN"]
+                        df_scan = df_scan[df_scan["Sembol"].isin(kucuk)]
+                    # Orta: tüm hisseler
 
-            with st.container():
-                dc1, dc2, dc3 = st.columns([2, 3, 1])
-                with dc1:
-                    st.markdown(f"""
-                    <div class="portfolio-card">
-                        <div class="portfolio-ticker">{row['sym']}</div>
-                        <div class="portfolio-detail">
-                            {row['adet']} adet  x  TL {row['maliyet']:,.2f} maliyet
-                        </div>
-                        <div style="margin-top:0.6rem;">
-                            <span style="font-size:1.1rem;font-weight:700;color:#EAECEF;">
-                                TL {row['curr_p']:,.2f}
-                            </span>
-                            <span style="color:{kar_cls};font-size:0.85rem;margin-left:0.5rem;">
-                                {kar_sign}TL {abs(row['kar']):,.0f} ({kar_sign}{row['kar_pct']:.1f}%)
-                            </span>
-                        </div>
-                        <div class="portfolio-detail" style="margin-top:0.4rem;">
-                            RSI <span style="color:{rsi_col};">{row['rsi']:.1f}</span>
-                        </div>
-                    </div>""", unsafe_allow_html=True)
+                    # RSI < 60 olanları al (aşırı alımda değil)
+                    df_scan = df_scan[df_scan["RSI"] < 62].copy()
 
-                with dc2:
-                    st.markdown(f"""
-                    <div class="portfolio-card">
-                        <div class="bn-card-label">Yil Sonu Tahmin (Hisse Basina)</div>
-                        <div style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap;">
-                            <div>
-                                <div style="font-size:0.62rem;color:#848E9C;text-transform:uppercase;">Bull</div>
-                                <div style="font-size:1rem;font-weight:700;color:#0ECB81;">
-                                    TL {row['bull_val']/row['adet']:,.2f}
-                                    <span style="font-size:0.75rem;">(+{row['bull_ret']:.1f}%)</span>
+                    # Teknik skoru hesapla (daha düşük RSI + AL sinyali = daha iyi)
+                    def oneri_skoru(row):
+                        s = 0
+                        rsi = row.get("RSI", 50)
+                        act = str(row.get("Aksiyon", ""))
+                        if pd.notna(rsi):
+                            if rsi < 35:   s += 40
+                            elif rsi < 45: s += 25
+                            elif rsi < 55: s += 10
+                        if "GUCLU AL" in act: s += 30
+                        elif "AL" in act:     s += 20
+                        chg = row.get("Degisim %", 0)
+                        if pd.notna(chg) and chg > 0: s += 10
+                        return s
+
+                    df_scan["Oneri_Skoru"] = df_scan.apply(oneri_skoru, axis=1)
+                    df_scan = df_scan.sort_values("Oneri_Skoru", ascending=False).head(5)
+
+                    if df_scan.empty:
+                        st.warning("Secilen profile gore uygun hisse bulunamadi.")
+                    else:
+                        # Bütçeyi eşit dağıt
+                        n_hisse    = len(df_scan)
+                        hisse_butce = butce / n_hisse
+
+                        st.markdown(f"""
+                        <div style="background:#0D1F12;border:1px solid #1B4332;border-radius:8px;
+                        padding:1.2rem 1.4rem;margin:1rem 0;">
+                            <div style="font-size:0.8rem;color:#848E9C;margin-bottom:0.3rem;">Oneri Ozeti</div>
+                            <div style="font-size:1rem;color:#EAECEF;font-weight:600;">
+                                TL {butce:,.0f} butcen icin {n_hisse} hisse onerildi.
+                                Her birine yaklasik TL {hisse_butce:,.0f} yatirilacak.
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+
+                        st.markdown('<div class="section-title">Onerilen Hisseler</div>',
+                                    unsafe_allow_html=True)
+
+                        for idx, (_, hrow) in enumerate(df_scan.iterrows(), 1):
+                            sym    = hrow["Sembol"]
+                            fiyat  = hrow["Fiyat (TL)"]
+                            rsi    = hrow["RSI"]
+                            aksiyon = hrow["Aksiyon"]
+                            degisim = hrow["Degisim %"]
+                            adet_onerilecek = int(hisse_butce / fiyat) if fiyat > 0 else 0
+                            toplam_maliyet_oneri = adet_onerilecek * fiyat
+                            skoru  = hrow["Oneri_Skoru"]
+
+                            # Neden önerildi
+                            neden_listesi = []
+                            if pd.notna(rsi) and rsi < 35:
+                                neden_listesi.append("Asiri satim bolgesinde — ucuz gorunuyor")
+                            elif pd.notna(rsi) and rsi < 45:
+                                neden_listesi.append("RSI dusuk — alim firsat bolgesinde")
+                            if "GUCLU AL" in str(aksiyon) or "AL" in str(aksiyon):
+                                neden_listesi.append("Teknik analiz AL sinyali veriyor")
+                            if pd.notna(degisim) and degisim > 0:
+                                neden_listesi.append(f"Bugun +{degisim:.1f}% yukseliyor")
+                            if not neden_listesi:
+                                neden_listesi.append("Dengeli teknik gorum")
+                            neden_str = " · ".join(neden_listesi)
+
+                            rsi_c  = "#0ECB81" if pd.notna(rsi) and rsi<40 else \
+                                     "#F6465D" if pd.notna(rsi) and rsi>65 else "#848E9C"
+                            chg_c  = "#0ECB81" if pd.notna(degisim) and degisim>=0 else "#F6465D"
+                            chg_s  = "+" if pd.notna(degisim) and degisim>=0 else ""
+
+                            st.markdown(f"""
+                            <div style="background:#161A1E;border:1px solid #2B3139;
+                            border-left:3px solid #F0B90B;border-radius:8px;
+                            padding:1.2rem 1.4rem;margin-bottom:0.8rem;">
+                                <div style="display:flex;justify-content:space-between;
+                                align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+                                    <div>
+                                        <div style="display:flex;align-items:center;gap:0.8rem;">
+                                            <span style="font-size:1.4rem;font-weight:800;
+                                            color:#F0B90B;">#{idx} {sym}</span>
+                                            <span style="font-size:0.75rem;background:#0D2E1A;
+                                            color:#0ECB81;padding:0.15rem 0.5rem;border-radius:4px;
+                                            border:1px solid #1B5E35;">{aksiyon}</span>
+                                        </div>
+                                        <div style="font-size:0.8rem;color:#848E9C;margin-top:0.4rem;">
+                                            {neden_str}
+                                        </div>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        <div style="font-size:0.65rem;color:#848E9C;">Guncel Fiyat</div>
+                                        <div style="font-size:1.1rem;font-weight:700;color:#EAECEF;">
+                                            TL {fiyat:,.2f}
+                                        </div>
+                                        <div style="font-size:0.8rem;color:{chg_c};">
+                                            {chg_s}{degisim:.1f}% bugun
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div>
-                                <div style="font-size:0.62rem;color:#848E9C;text-transform:uppercase;">Baz</div>
-                                <div style="font-size:1rem;font-weight:700;color:#1E90FF;">
-                                    TL {row['base_val']/row['adet']:,.2f}
-                                    <span style="font-size:0.75rem;">({'+' if row['base_ret']>=0 else ''}{row['base_ret']:.1f}%)</span>
+                                <div style="display:flex;gap:2rem;margin-top:1rem;padding-top:0.8rem;
+                                border-top:1px solid #2B3139;flex-wrap:wrap;">
+                                    <div>
+                                        <div style="font-size:0.62rem;color:#848E9C;">Onerilecek Adet</div>
+                                        <div style="font-size:1rem;font-weight:700;color:#EAECEF;">
+                                            {adet_onerilecek} adet
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.62rem;color:#848E9C;">Bu Hisseye Yatirim</div>
+                                        <div style="font-size:1rem;font-weight:700;color:#F0B90B;">
+                                            TL {toplam_maliyet_oneri:,.0f}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.62rem;color:#848E9C;">RSI</div>
+                                        <div style="font-size:1rem;font-weight:700;color:{rsi_c};">
+                                            {rsi:.0f}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.62rem;color:#848E9C;">Teknik Skor</div>
+                                        <div style="font-size:1rem;font-weight:700;color:#848E9C;">
+                                            {skoru}/100
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div>
-                                <div style="font-size:0.62rem;color:#848E9C;text-transform:uppercase;">Bear</div>
-                                <div style="font-size:1rem;font-weight:700;color:#F6465D;">
-                                    TL {row['bear_val']/row['adet']:,.2f}
-                                    <span style="font-size:0.75rem;">({row['bear_ret']:.1f}%)</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="margin-top:0.6rem;">
-                            <div style="font-size:0.62rem;color:#848E9C;margin-bottom:0.2rem;">Toplam Portfoy Degeri (Yil Sonu)</div>
-                            <div style="display:flex;gap:0.6rem;">
-                                <span style="color:#0ECB81;font-size:0.85rem;font-weight:600;">{fmt_tl(row['bull_val'])}</span>
-                                <span style="color:#848E9C;">|</span>
-                                <span style="color:#1E90FF;font-size:0.85rem;font-weight:600;">{fmt_tl(row['base_val'])}</span>
-                                <span style="color:#848E9C;">|</span>
-                                <span style="color:#F6465D;font-size:0.85rem;font-weight:600;">{fmt_tl(row['bear_val'])}</span>
-                            </div>
-                        </div>
-                    </div>""", unsafe_allow_html=True)
+                            </div>""", unsafe_allow_html=True)
 
-                with dc3:
-                    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-                    if st.button(f"Sil  {row['sym']}", key=f"del_{row['sym']}", use_container_width=True):
-                        del st.session_state.portfolio[row["sym"]]
-                        st.rerun()
+                        # Portföye ekle butonu
+                        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+                        if st.button("Bu Onerileri Portfoyume Ekle", type="primary"):
+                            for _, hrow in df_scan.iterrows():
+                                sym   = hrow["Sembol"]
+                                fiyat = hrow["Fiyat (TL)"]
+                                adet  = int(hisse_butce / fiyat) if fiyat > 0 else 0
+                                if adet > 0:
+                                    st.session_state.portfolio[sym] = {
+                                        "adet": adet, "maliyet": round(fiyat, 2)
+                                    }
+                            st.success("Oneriler portfoyunuze eklendi! 'Portfoyum' sekmesine gecin.")
+                            st.rerun()
 
-        # ── Portföy Pasta Grafiği ─────────────────────────────
-        if len(portfolio_rows) > 1:
-            st.markdown('<div class="section-title">Portfoy Dagilimi</div>', unsafe_allow_html=True)
-            labels = [r["sym"] for r in portfolio_rows]
-            values = [r["toplam_guncel"] for r in portfolio_rows]
-            colors = ["#F0B90B","#0ECB81","#1E90FF","#F6465D","#C084FC",
-                      "#FB923C","#34D399","#60A5FA","#F472B6","#A3E635"]
-
-            fig_pie = go.Figure(go.Pie(
-                labels=labels, values=values,
-                hole=0.55,
-                marker=dict(colors=colors[:len(labels)],
-                            line=dict(color="#0B0E11", width=2)),
-                textinfo="label+percent",
-                textfont=dict(family="IBM Plex Mono", size=11, color="#EAECEF"),
-                hovertemplate="<b>%{label}</b><br>%{value:,.0f} TL<br>%{percent}<extra></extra>",
-            ))
-            fig_pie.update_layout(
-                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                legend=dict(font=dict(family="IBM Plex Mono", color="#848E9C", size=10)),
-                margin=dict(t=20,b=20,l=20,r=20), height=320,
-                annotations=[dict(
-                    text=f"TL {total_guncel:,.0f}",
-                    font=dict(size=14, color="#EAECEF", family="IBM Plex Sans"),
-                    showarrow=False,
-                )],
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
+                        st.markdown("""
+                        <div style="font-size:0.72rem;color:#4B5563;margin-top:0.8rem;
+                        padding:0.6rem;border-radius:4px;background:#111318;">
+                        Bu oneriler yapay zeka destekli teknik analiz sonucudur.
+                        Yatirim karari vermeden once kendi arastirmanizi yapiniz.
+                        Sistem gecmis performansa dayanir, gelecegi garanti etmez.
+                        </div>""", unsafe_allow_html=True)
 
 # ==========================================
 # FOOTER
