@@ -545,36 +545,3 @@ with tab_binance:
         else:
             st.warning("Webhook sinyallerini görmek için API anahtarlarınızla giriş yapmalısınız.")
 
-name: Yapay Zeka Modelini Egit
-
-on:
-  schedule:
-    - cron: '0 3 * * *' # Her gece saat 03:00'te otomatik çalışır
-  workflow_dispatch: # İstediğin zaman manuel çalıştırman için bir buton ekler
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Depoyu Klonla
-        uses: actions/checkout@v3
-
-      - name: Python Kurulumu
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Kütüphaneleri Kur
-        run: pip install -r requirements.txt
-
-      - name: AI Botunu Calistir ve Egit
-        run: python ai_beyin.py
-
-      - name: Yeni Beyni ve Hafizayi GitHub'a Kaydet
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Bot"
-          git add borsa_hafiza.db bas_ekonomist_modeli.pkl
-          git commit -m "🤖 AI Beyni her geceki eğitimi tamamladı ve güncellendi" || echo "Değişiklik yok"
-          git push
