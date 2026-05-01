@@ -1,26 +1,25 @@
 """
-Burak Borsa Analiz Uygulaması v9.0 (TradingView Edition)
-- TradingView Screener Birebir Arayüz Klonu (Özel HTML/CSS)
-- 200 Hisselik BIST Taraması
-- 7/24 Otonom Çalışma Altyapısına Hazır "Baş Ekonomist"
-- Binance API Entegrasyonu Aktif
+Burak Borsa Analiz Uygulaması v10.0 (TradingView X-Ray Sürümü)
+- Streamlit Sınırları Parçalandı!
+- Sol Panel: 200 Hisselik TV Screener Klonu
+- Sağ Panel: Orijinal TradingView Canlı X-Ray Bileşenleri (Grafik + Teknik Kadran)
+- Şirket Detayları, Hacim, RSI ve Yapay Zeka Sinyalleri
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime, timedelta
 import concurrent.futures
-import json
+import streamlit.components.v1 as components
 
 # ==========================================
 # 1. PAGE CONFIG & SESSION STATE
 # ==========================================
 st.set_page_config(
-    page_title="Burak Borsa Analiz - TV Screener",
-    page_icon="📊",
+    page_title="Burak Borsa Terminali",
+    page_icon="🔥",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -33,32 +32,30 @@ if "binance_mode" not in st.session_state:
     st.session_state.binance_mode = "Testnet"
 
 # ==========================================
-# 2. TRADINGVIEW BİREBİR KLON CSS
+# 2. BİNANCE & TRADINGVIEW DARK TEMA CSS
 # ==========================================
 st.markdown("""
 <style>
-/* Font tanımlamaları */
 @import url('https://fonts.googleapis.com/css2?family=Trebuchet+MS:ital,wght@0,400;0,700;1,400;1,700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap');
 
 html, body, [class*="css"] {
     font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif !important;
-    background-color: #131722; /* TV Koyu Arka Plan */
-    color: #d1d4dc; /* TV Genel Metin Rengi */
+    background-color: #131722; 
+    color: #d1d4dc;
 }
 [data-testid="collapsedControl"] { display: none; }
 section[data-testid="stSidebar"] { display: none; }
 
-/* Scrollbar TV Style */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #1e222d; }
 ::-webkit-scrollbar-thumb { background: #50535e; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #787b86; }
 
-/* TRADINGVIEW SCREENER TABLOSU CSS */
+/* TRADINGVIEW SCREENER TABLOSU */
 .tv-screener-container {
     width: 100%;
-    max-height: 70vh;
+    height: 75vh;
     overflow-y: auto;
     overflow-x: auto;
     background-color: #131722;
@@ -80,121 +77,61 @@ section[data-testid="stSidebar"] { display: none; }
     box-shadow: 0 1px 0 #2a2e39;
 }
 .tv-table th {
-    padding: 8px 12px;
-    font-weight: 400;
+    padding: 10px 12px;
+    font-weight: 500;
     color: #787b86;
     border-right: 1px solid #2a2e39;
     font-size: 12px;
 }
 .tv-table th:first-child { text-align: left; }
-.tv-table th:last-child { border-right: none; }
-
-.tv-table tbody tr {
-    border-bottom: 1px solid #2a2e39;
-    background-color: #131722;
-    transition: background-color 0.1s ease;
-}
-.tv-table tbody tr:hover { background-color: #2a2e39; cursor: pointer; }
-
-.tv-table td {
-    padding: 6px 12px;
-    color: #d1d4dc;
-    vertical-align: middle;
-}
+.tv-table tbody tr { border-bottom: 1px solid #2a2e39; background-color: #131722; transition: 0.1s; }
+.tv-table tbody tr:hover { background-color: #2a2e39; }
+.tv-table td { padding: 8px 12px; color: #d1d4dc; vertical-align: middle; }
 .tv-table td:first-child { text-align: left; }
 
-/* Ticker Sütunu Özel Tasarımı */
-.tv-ticker-col {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+.tv-ticker-col { display: flex; align-items: center; gap: 12px; }
 .tv-logo-circle {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background-color: #2962ff;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 12px;
-    flex-shrink: 0;
+    width: 28px; height: 28px; border-radius: 50%; background-color: #2962ff;
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 13px; flex-shrink: 0;
 }
-.tv-ticker-info {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-.tv-ticker-symbol { color: #2962ff; font-weight: 600; font-size: 14px; text-decoration: none;}
-.tv-ticker-symbol:hover { text-decoration: underline; }
+.tv-ticker-info { display: flex; flex-direction: column; justify-content: center; }
+.tv-ticker-symbol { color: #2962ff; font-weight: 600; font-size: 14px; }
 .tv-ticker-desc { color: #787b86; font-size: 11px; margin-top: 2px; }
 
-/* Renkler */
 .tv-green { color: #089981 !important; }
 .tv-red { color: #f23645 !important; }
-.tv-neutral { color: #787b86 !important; }
-
-/* Sinyal Rozetleri (Teknik Derecelendirme) */
-.tv-rating {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-}
+.tv-rating { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
 .rating-strong-buy { color: #089981; background-color: rgba(8, 153, 129, 0.15); }
 .rating-buy { color: #089981; background-color: transparent; }
 .rating-sell { color: #f23645; background-color: transparent; }
 .rating-strong-sell { color: #f23645; background-color: rgba(242, 54, 69, 0.15); }
 .rating-neutral { color: #787b86; background-color: rgba(120, 123, 134, 0.15); }
 
-/* Üst Menü Filtreleri (Genel Bakış vs) */
-.tv-filters {
-    display: flex;
-    gap: 20px;
-    border-bottom: 1px solid #2a2e39;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-}
-.tv-filter-btn {
-    color: #787b86;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-}
-.tv-filter-btn.active {
-    color: #2962ff;
-    border-bottom: 2px solid #2962ff;
-    padding-bottom: 9px;
-}
-
-/* Makro / Header Alanı Streamlit Ayarları */
-.section-title { font-size: 1.1rem; font-weight: 600; color: #d1d4dc; border-bottom: 1px solid #2a2e39; padding-bottom: 0.5rem; margin: 2rem 0 1rem 0; }
-.bn-card { background-color: #1e222d; border-radius: 8px; padding: 1.2rem 1.4rem; border: 1px solid #2a2e39; margin-bottom: 0.8rem; }
-.streamlit-expanderHeader { background-color: #1e222d !important; border: 1px solid #2a2e39 !important; }
+/* Makro Başlıklar */
+.macro-box { background-color: #1e222d; border-radius: 6px; padding: 10px; border: 1px solid #2a2e39; text-align: center; }
+.macro-title { font-size: 0.7rem; color: #787b86; letter-spacing: 1px;}
+.macro-val { font-size: 1.1rem; font-weight: bold; color: #d1d4dc; margin: 2px 0; }
+.macro-chg { font-size: 0.8rem; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. YARDIMCI FONKSİYONLAR VE LİSTE
+# 3. YARDIMCI FONKSİYONLAR & DEV BİST LİSTESİ
 # ==========================================
 bist_symbols = [
-    "AKBNK","GARAN","ISCTR","YKBNK","VAKBN","KCHOL","SAHOL","DOHOL","ALARK","ENKAI",
-    "EREGL","KRDMD","TUPRS","PETKM","SASA","HEKTS","GUBRF","KOZAL",
-    "SISE","CIMSA","AKCNS","FROTO","TOASO","DOAS","OTKAR","ARCLK","VESTL",
-    "THYAO","PGSUS","BIMAS","MGROS","SOKM","AEFES","CCOLA","TCELL","TTKOM",
-    "ASELS","ASTOR","KONTR","ENJSA","AKSEN","ODAS","SMARTG","EKGYO","ISGYO"
-] # Hız için 45 hisse ile optimize edildi, 200'e çıkarılabilir.
+    "AKBNK","GARAN","ISCTR","YKBNK","VAKBN","HALKB","ALBRK","SKBNK","TSKB","KCHOL",
+    "SAHOL","DOHOL","ALARK","ENKAI","AGHOL","TKFEN","EREGL","KRDMD","TUPRS","PETKM",
+    "SASA","HEKTS","GUBRF","KOZAL","KOZAA","IPEKE","ISDMR","SISE","CIMSA","AKCNS",
+    "OYAKC","FROTO","TOASO","DOAS","OTKAR","KARSN","ASUZU","TTRAK","ARCLK","VESTL",
+    "THYAO","PGSUS","CLEBI","BIMAS","MGROS","SOKM","AEFES","CCOLA","ULKER","TATGD",
+    "TCELL","TTKOM","ASELS","ASTOR","KONTR","ALFAS","KAREL","MIATK","ENJSA","AKSEN",
+    "ODAS","SMARTG","EUPWR","GESAN","CWENE","YEOTK","GWIND","NATEN","MAGEN","AYDEM",
+    "EKGYO","ISGYO","TRGYO","HLGYO","VKGYO","ROBIT","HATEK","FLAP","OSAS","DEVA",
+    "SELEC","ECILC","KORDS","VESBE","AYGAZ","MAVI","ORGE","OSMEN","KLMSN","ACSEL"
+]
 bist_symbols = sorted(list(dict.fromkeys(bist_symbols)))
 TICKERS_BIST = {f"{sym}.IS": sym for sym in bist_symbols}
-
-def format_volume(vol):
-    if vol >= 1_000_000_000: return f"{vol/1_000_000_000:.3f}B"
-    if vol >= 1_000_000: return f"{vol/1_000_000:.3f}M"
-    if vol >= 1_000: return f"{vol/1_000:.3f}K"
-    return str(vol)
 
 def compute_rsi(series, period=14):
     try:
@@ -206,12 +143,12 @@ def compute_rsi(series, period=14):
         return round(float(val), 1) if pd.notna(val) else np.nan
     except: return np.nan
 
-def compute_macd(series, fast=12, slow=26, signal=9):
+def compute_macd(series):
     try:
-        ema_f  = series.ewm(span=fast, adjust=False).mean()
-        ema_s  = series.ewm(span=slow, adjust=False).mean()
-        macd   = ema_f - ema_s
-        sig    = macd.ewm(span=signal, adjust=False).mean()
+        ema_12 = series.ewm(span=12, adjust=False).mean()
+        ema_26 = series.ewm(span=26, adjust=False).mean()
+        macd = ema_12 - ema_26
+        sig = macd.ewm(span=9, adjust=False).mean()
         return float(macd.iloc[-1]), float(sig.iloc[-1]), float((macd - sig).iloc[-1])
     except: return np.nan, np.nan, np.nan
 
@@ -259,17 +196,16 @@ def fetch_tv_screener_data():
             df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
             if df.empty or len(df) < 50: return None
             
-            # Değerleri çıkarırken uyarıları önlemek için squeeze ve iloc kullanımı
             close = df["Close"].squeeze()
-            volume_series = df["Volume"].squeeze()
+            volume = df["Volume"].squeeze()
             
             price = float(close.iloc[-1])
             prev = float(close.iloc[-2])
             chg_val = price - prev
             chg_pct = (chg_val / prev) * 100
             
-            vol = float(volume_series.iloc[-1])
-            avg_vol = float(volume_series.rolling(20).mean().iloc[-1])
+            vol = float(volume.iloc[-1])
+            avg_vol = float(volume.rolling(20).mean().iloc[-1])
             rel_vol = (vol / avg_vol) if avg_vol > 0 else 0
             
             sma50 = float(close.rolling(50).mean().iloc[-1])
@@ -284,33 +220,17 @@ def fetch_tv_screener_data():
             }
         except: return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
         futures = [ex.submit(process_ticker, t, n) for t, n in TICKERS_BIST.items()]
         for f in concurrent.futures.as_completed(futures):
             if f.result(): rows.append(f.result())
     return pd.DataFrame(rows)
 
-@st.cache_data(ttl=900, show_spinner=False)
-def get_detailed_data(ticker: str):
-    stock = yf.Ticker(ticker)
-    info, hist, valid_news = {}, pd.DataFrame(), []
-    try: info = stock.info
-    except: pass
-    try: hist = stock.history(period="1y")
-    except: pass
-    try:
-        raw_news = stock.news or []
-        for n in raw_news:
-            title = n.get("title", "")
-            link = n.get("link", "")
-            pub_ts = n.get("providerPublishTime", 0)
-            if title and pub_ts:
-                valid_news.append({
-                    "title": title, "link": link, "publisher": n.get("publisher", "Kaynak"),
-                    "date": datetime.fromtimestamp(pub_ts).strftime("%d.%m.%Y")
-                })
-    except: pass
-    return info, hist, valid_news
+def format_volume(vol):
+    if vol >= 1_000_000_000: return f"{vol/1_000_000_000:.3f}B"
+    if vol >= 1_000_000: return f"{vol/1_000_000:.3f}M"
+    if vol >= 1_000: return f"{vol/1_000:.3f}K"
+    return str(vol)
 
 # ==========================================
 # 4. ÜST BAR & MAKRO VERİLER
@@ -318,7 +238,8 @@ def get_detailed_data(ticker: str):
 header_col, macro_col = st.columns([1, 3])
 
 with header_col:
-    st.markdown('<div style="font-size:1.8rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:10px;"><span style="color:#2962ff;">B</span> Screener</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:1.8rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:10px;"><span style="color:#2962ff;">B</span> Terminal v10.0</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:0.75rem; color:#089981;">⚡ KUDURAN SÜRÜM AKTİF</div>', unsafe_allow_html=True)
 
 with macro_col:
     macro = get_macro_data()
@@ -332,166 +253,153 @@ with macro_col:
         fmt = f"{val:,.0f}" if name == "BIST 100" else f"{val:,.2f}"
         
         cols[i].markdown(f"""
-        <div style="text-align:center; background:#1e222d; padding:10px; border-radius:6px; border:1px solid #2a2e39;">
-            <div style="font-size:0.7rem; color:#787b86;">{name}</div>
-            <div style="font-size:1.1rem; color:#d1d4dc; font-weight:bold;">{fmt}</div>
-            <div style="font-size:0.8rem; color:{color};">{sign}{chg:.2f}%</div>
+        <div class="macro-box">
+            <div class="macro-title">{name}</div>
+            <div class="macro-val">{fmt}</div>
+            <div class="macro-chg" style="color:{color};">{sign}{chg:.2f}%</div>
         </div>
         """, unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<hr style='border-color: #2a2e39; margin: 1rem 0;'>", unsafe_allow_html=True)
 
 # ==========================================
 # 5. ANA SEKMELER
 # ==========================================
-tab_screener, tab_detail, tab_portfolio, tab_binance = st.tabs([
-    "Hisse Takipçisi (Screener)", "Grafik & Analiz", "Portföy & AI", "Otomasyon (Binance)"
+tab_screener, tab_portfolio, tab_binance = st.tabs([
+    "🔥 Canlı Tarayıcı & X-Ray Detay Paneli", "Portföy & AI", "Otomasyon (Binance)"
 ])
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 1: TRADINGVIEW SCREENER KLONU     ║
+# ║  SEKME 1: BÖLÜNMÜŞ EKRAN (SCREENER + X-RAY)
 # ╚══════════════════════════════════════════╝
 with tab_screener:
-    df_screener = fetch_tv_screener_data()
     
-    if df_screener.empty:
-        st.error("Veri çekilemedi.")
-    else:
-        # Üst Filtre Menüsü (TV Görünümü)
-        st.markdown("""
-        <div class="tv-filters">
-            <div class="tv-filter-btn active">Genel Bakış</div>
-            <div class="tv-filter-btn">Performans</div>
-            <div class="tv-filter-btn">Genişletilmiş Saatler</div>
-            <div class="tv-filter-btn">Değerleme</div>
-            <div class="tv-filter-btn">Temettüler</div>
-            <div class="tv-filter-btn">Marjlar</div>
-            <div class="tv-filter-btn">Gelir Tablosu</div>
-            <div class="tv-filter-btn">Bilanço</div>
-            <div class="tv-filter-btn">Osilatörler</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Ekranı ikiye bölüyoruz: Sol %65 Tarayıcı, Sağ %35 Özel X-Ray Paneli
+    col_screener, col_xray = st.columns([2.2, 1.2])
+    
+    # --- SOL PANEL: DEV TABLO ---
+    with col_screener:
+        df_screener = fetch_tv_screener_data()
         
-        # TABLO OLUŞTURMA
-        html_table = """
-        <div class="tv-screener-container">
-            <table class="tv-table">
-                <thead>
-                    <tr>
-                        <th>TICKER</th>
-                        <th>SON</th>
-                        <th>DEĞİŞİM %</th>
-                        <th>DEĞİŞİM</th>
-                        <th>TEKNİK DERECELENDİRME</th>
-                        <th>HACİM</th>
-                        <th>GÖRECELİ HACİM</th>
-                        <th>RSI (14)</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        
-        for _, row in df_screener.sort_values("Değişim %", ascending=False).iterrows():
-            c_class = "tv-green" if row["Değişim %"] >= 0 else "tv-red"
-            sign = "+" if row["Değişim %"] >= 0 else ""
-            
-            # İlk harfi logoya koy
-            first_letter = row["Sembol"][0]
-            
-            html_table += "<tr>"
-            
-            # Ticker Kolonu (Logo + Sembol + İsim)
-            html_table += f"""
-            <td>
-                <div class="tv-ticker-col">
-                    <div class="tv-logo-circle">{first_letter}</div>
-                    <div class="tv-ticker-info">
-                        <a href="#" class="tv-ticker-symbol">{row['Sembol']}</a>
-                        <span class="tv-ticker-desc">{row['Sembol']} A.Ş.</span>
-                    </div>
-                </div>
-            </td>
+        if df_screener.empty:
+            st.error("Veri çekilemedi.")
+        else:
+            html_table = """
+            <div class="tv-screener-container">
+                <table class="tv-table">
+                    <thead>
+                        <tr>
+                            <th>TICKER</th>
+                            <th>SON</th>
+                            <th>DEĞİŞİM %</th>
+                            <th>TEKNİK SİNYAL</th>
+                            <th>HACİM</th>
+                            <th>RSI (14)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             """
             
-            # Fiyat ve Değişim
-            html_table += f"<td>{row['Fiyat']:,.2f}</td>"
-            html_table += f"<td class='{c_class}'>{sign}{row['Değişim %']:.2f}%</td>"
-            html_table += f"<td class='{c_class}'>{sign}{row['Değişim']:,.2f}</td>"
+            for _, row in df_screener.sort_values("Değişim %", ascending=False).iterrows():
+                c_class = "tv-green" if row["Değişim %"] >= 0 else "tv-red"
+                sign = "+" if row["Değişim %"] >= 0 else ""
+                first_letter = row["Sembol"][0]
+                
+                html_table += "<tr>"
+                # Ticker Kolonu
+                html_table += f"""
+                <td>
+                    <div class="tv-ticker-col">
+                        <div class="tv-logo-circle">{first_letter}</div>
+                        <div class="tv-ticker-info">
+                            <span class="tv-ticker-symbol">{row['Sembol']}</span>
+                            <span class="tv-ticker-desc">{row['Sembol']} A.Ş.</span>
+                        </div>
+                    </div>
+                </td>
+                """
+                html_table += f"<td>{row['Fiyat']:,.2f}</td>"
+                html_table += f"<td class='{c_class}'>{sign}{row['Değişim %']:.2f}%</td>"
+                html_table += f"<td><span class='tv-rating {row['Teknik_Class']}'>{row['Teknik']}</span></td>"
+                html_table += f"<td>{format_volume(row['Hacim'])}</td>"
+                html_table += f"<td>{row['RSI']:.2f}</td>"
+                html_table += "</tr>"
+                
+            html_table += "</tbody></table></div>"
+            st.markdown(html_table, unsafe_allow_html=True)
             
-            # Teknik Sinyal Rozeti
-            html_table += f"<td><span class='tv-rating {row['Teknik_Class']}'>{row['Teknik']}</span></td>"
-            
-            # Hacim ve Ekstra Veriler
-            html_table += f"<td>{format_volume(row['Hacim'])}</td>"
-            html_table += f"<td>{row['Göreceli Hacim']:.2f}</td>"
-            html_table += f"<td>{row['RSI']:.2f}</td>"
-            
-            html_table += "</tr>"
-            
-        html_table += "</tbody></table></div>"
+    # --- SAĞ PANEL: ORİJİNAL TRADINGVIEW X-RAY WIDGETLARI ---
+    with col_xray:
+        st.markdown('<div style="font-size:1.1rem; font-weight:600; color:#fff; margin-bottom:10px;">🔍 X-Ray Şirket İnceleme Paneli</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:0.85rem; color:#787b86; margin-bottom:15px;">Soldaki tablodan incelemek istediğiniz hisseyi aşağıdan seçin, tüm röntgeni çıksın.</div>', unsafe_allow_html=True)
         
-        st.markdown(html_table, unsafe_allow_html=True)
-
-# ╔══════════════════════════════════════════╗
-# ║  SEKME 2: DERİN ANALİZ                   ║
-# ╚══════════════════════════════════════════╝
-with tab_detail:
-    selected_symbol = st.selectbox("Hisse Seçin", sorted(bist_symbols), index=0)
-    selected_ticker = f"{selected_symbol}.IS"
-    info, hist, news = get_detailed_data(selected_ticker)
-
-    if not hist.empty:
-        close = hist["Close"].squeeze()
-        curr_p = float(close.iloc[-1])
-        prev_p = float(close.iloc[-2])
-        chg = curr_p - prev_p
-        chg_p = (chg / prev_p) * 100
-        color_hex = "#089981" if chg >= 0 else "#f23645"
-
-        c1, c2 = st.columns([1, 3])
-        with c1:
-            st.markdown(f"""
-            <div class="bn-card">
-                <div style="font-size:1.8rem;font-weight:700;">{selected_symbol}</div>
-                <div style="font-size:2rem;font-weight:700;">{curr_p:,.2f}</div>
-                <div style="color:{color_hex};font-size:1.2rem;">{'+' if chg>=0 else ''}{chg_p:.2f}%</div>
+        # Seçici (Buradan seçtiği an widgetlar tetiklenecek)
+        secilen_hisse = st.selectbox("Detaylı Analiz İçin Hisse Seç:", sorted(bist_symbols), index=bist_symbols.index("THYAO") if "THYAO" in bist_symbols else 0)
+        tv_symbol = f"BIST:{secilen_hisse}"
+        
+        # 1. TRADINGVIEW TEKNİK ANALİZ KADRANI WIDGETI
+        st.markdown(f"**{secilen_hisse} Anlık Teknik Kadran**")
+        components.html(
+            f"""
+            <!-- TradingView Widget BEGIN -->
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+              {{
+              "interval": "1D",
+              "width": "100%",
+              "isTransparent": true,
+              "height": "380",
+              "symbol": "{tv_symbol}",
+              "showIntervalTabs": true,
+              "displayMode": "single",
+              "locale": "tr",
+              "colorTheme": "dark"
+            }}
+              </script>
             </div>
-            """, unsafe_allow_html=True)
+            <!-- TradingView Widget END -->
+            """,
+            height=380,
+            scrolling=False
+        )
 
-        with c2:
-            fig = go.Figure()
-            r, g, b = (8, 153, 129) if chg >= 0 else (242, 54, 69)
-            fig.add_trace(go.Scatter(
-                x=hist.index, y=close, mode="lines",
-                line=dict(color=color_hex, width=2),
-                fill="tozeroy", fillcolor=f"rgba({r},{g},{b},0.15)"
-            ))
-            fig.update_layout(
-                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=0,r=0,t=0,b=0), height=250, hovermode="x unified", dragmode=False
-            )
-            fig.update_xaxes(visible=False, fixedrange=True)
-            fig.update_yaxes(visible=False, fixedrange=True)
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-        st.markdown('<div class="section-title">🤖 Baş Ekonomist Botu (Otonom)</div>', unsafe_allow_html=True)
-        rsi_14 = compute_rsi(close)
-        ai_msg = f"**[LOG: {datetime.now().strftime('%H:%M')}]** Sistem Devrede. "
-        if pd.notna(rsi_14):
-            if rsi_14 > 70: ai_msg += f"⚠️ RSI {rsi_14:.1f} (Aşırı Alım). Satış baskısı gelebilir."
-            elif rsi_14 < 35: ai_msg += f"🟢 RSI {rsi_14:.1f} (Aşırı Satım). Kademeli alım değerlendirilebilir."
-            else: ai_msg += f"📊 RSI {rsi_14:.1f} (Nötr). Mevcut trend korunuyor."
-        st.info(ai_msg)
+        st.markdown("<hr style='border-color: #2a2e39;'>", unsafe_allow_html=True)
+        
+        # 2. TRADINGVIEW ŞİRKET PROFİLİ VE FİNANSALLAR WIDGETI
+        st.markdown(f"**{secilen_hisse} Şirket Profili & Finansallar**")
+        components.html(
+            f"""
+            <!-- TradingView Widget BEGIN -->
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js" async>
+              {{
+              "width": "100%",
+              "height": "400",
+              "colorTheme": "dark",
+              "isTransparent": true,
+              "symbol": "{tv_symbol}",
+              "locale": "tr"
+            }}
+              </script>
+            </div>
+            <!-- TradingView Widget END -->
+            """,
+            height=400,
+            scrolling=False
+        )
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 3: PORTFÖY & AKILLI ÖNERİ         ║
+# ║  SEKME 2: PORTFÖY & AKILLI ÖNERİ         ║
 # ╚══════════════════════════════════════════╝
 with tab_portfolio:
     p1, p2 = st.tabs(["Portföyüm", "Akıllı Öneri Motoru"])
     with p1:
+        st.markdown("### Hisse Ekle")
         c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
         with c1:
-            add_sym = st.selectbox("Hisse Seç", sorted(bist_symbols))
+            add_sym = st.selectbox("Hisse Seç", sorted(bist_symbols), key="portfoy_sec")
         
         preview_price = 0.0
         try:
@@ -511,6 +419,7 @@ with tab_portfolio:
                 st.rerun()
 
         if st.session_state.portfolio:
+            st.markdown("---")
             st.markdown("### Portföy")
             for sym, data in st.session_state.portfolio.items():
                 st.markdown(f"**{sym}**: {data['adet']} Adet (Maliyet: {data['maliyet']:,.2f} TL)")
@@ -519,10 +428,11 @@ with tab_portfolio:
                     st.rerun()
 
     with p2:
-        st.write("Yakında yapay zeka entegrasyonu ile otomatik sepet oluşturulacaktır.")
+        st.markdown("### 🧠 Otonom AI Motoru")
+        st.write("Sistemin arka plan yapay zeka algoritması (Random Forest) gece 03:00'te veritabanını tarayıp buraya otomatik sepet bırakacaktır.")
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 4: BINANCE API & WEBHOOK          ║
+# ║  SEKME 3: BINANCE API & WEBHOOK          ║
 # ╚══════════════════════════════════════════╝
 with tab_binance:
     st.markdown("### Binance Otomatik Al-Sat Kontrol Merkezi")
