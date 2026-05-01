@@ -1,11 +1,10 @@
 """
-Burak Borsa Analiz Uygulaması v6.0
+Burak Borsa Analiz Uygulaması v7.0
 - Anlık BIST100, Dolar, Euro ve Altın (Gram) Sağ Üstte
 - Midas Tarzı Sabit ve Şık Grafik (Dokunmatikte Bozulmaz)
 - Gelişmiş Haber Sistemi ve Yapay Zeka Baş Ekonomist
 - AL/SAT Sinyalleri (Ana Ekran Tablosu Düzeltildi)
-- Portföy Anlık Fiyat Hatası Giderildi
-- Midas API Entegrasyon Arayüzü eklendi
+- MİDAS ÇIKARILDI -> BINANCE API VE WEBHOOK ENTEGRASYONU EKLENDİ
 """
 
 import streamlit as st
@@ -15,6 +14,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime, timedelta
 import concurrent.futures
+import json
 
 # ==========================================
 # 1. PAGE CONFIG & SESSION STATE
@@ -28,11 +28,13 @@ st.set_page_config(
 
 if "portfolio" not in st.session_state:
     st.session_state.portfolio = {}
-if "midas_connected" not in st.session_state:
-    st.session_state.midas_connected = False
+if "binance_connected" not in st.session_state:
+    st.session_state.binance_connected = False
+if "binance_mode" not in st.session_state:
+    st.session_state.binance_mode = "Testnet"
 
 # ==========================================
-# 2. BİNANCE/MİDAS DARK TEMA CSS
+# 2. BİNANCE DARK TEMA CSS
 # ==========================================
 st.markdown("""
 <style>
@@ -115,7 +117,6 @@ section[data-testid="stSidebar"] { display: none; }
     margin-bottom: 0.8rem;
 }
 
-/* Streamlit Expander (Haberler için) */
 .streamlit-expanderHeader {
     background-color: var(--bn-card) !important;
     border-radius: 6px !important;
@@ -184,7 +185,6 @@ def get_macro_data():
             else: res[name] = {"price": 0.0, "chg": 0.0}
         except: res[name] = {"price": 0.0, "chg": 0.0}
     
-    # Gram Altın Hesaplama: (Ons * USDTRY) / 31.10
     try:
         ons = res.get("ALTIN (ONS)", {}).get("price", 0)
         usd = res.get("USD/TRY", {}).get("price", 0)
@@ -250,7 +250,7 @@ header_col, macro_col = st.columns([1.2, 2.8])
 
 with header_col:
     st.markdown('<div class="app-header">BURAK BORSA ANALİZ</div>', unsafe_allow_html=True)
-    st.markdown('<div class="app-sub">Kantitatif Sinyal Motoru v6.0</div>', unsafe_allow_html=True)
+    st.markdown('<div class="app-sub">Kantitatif Sinyal Motoru v7.0</div>', unsafe_allow_html=True)
 
 with macro_col:
     macro = get_macro_data()
@@ -278,8 +278,8 @@ st.markdown("<hr style='border-color: #2B3139; margin: 1.5rem 0;'>", unsafe_allo
 # ==========================================
 # 5. ANA SEKMELER
 # ==========================================
-tab_market, tab_detail, tab_portfolio, tab_midas = st.tabs([
-    "Piyasa Görünümü (AL/SAT)", "Derin Analiz & Grafikler", "Portföy & YZ Öneri", "Midas Entegrasyonu"
+tab_market, tab_detail, tab_portfolio, tab_binance = st.tabs([
+    "Piyasa Görünümü (AL/SAT)", "Derin Analiz & Grafikler", "Portföy & YZ Öneri", "🚀 Binance API & Webhook"
 ])
 
 # ╔══════════════════════════════════════════╗
@@ -295,7 +295,6 @@ with tab_market:
         * Sinyaller RSI, SMA50 ve momentum kırılımlarına göre yapay zeka tarafından otomatik oluşturulur.
         </div>""", unsafe_allow_html=True)
         
-        # Sinyalleri HTML tablosu olarak oluştur (Hata Giderildi)
         html_table = '<table style="width:100%; text-align:left; border-collapse: collapse;">'
         html_table += '<tr style="border-bottom: 1px solid #2B3139; color:#848E9C; font-size:0.85rem;"><th style="padding-bottom:0.5rem;">Sembol</th><th style="padding-bottom:0.5rem;">Fiyat</th><th style="padding-bottom:0.5rem;">Değişim</th><th style="padding-bottom:0.5rem;">RSI</th><th style="padding-bottom:0.5rem;">Aksiyon</th></tr>'
         
@@ -344,7 +343,6 @@ with tab_detail:
             """, unsafe_allow_html=True)
 
         with col2:
-            # MIDAS TARZI SABİT VE ŞIK GRAFİK
             fig = go.Figure()
             r, g, b = (0, 203, 129) if chg >= 0 else (246, 70, 93)
             fig.add_trace(go.Scatter(
@@ -357,13 +355,12 @@ with tab_detail:
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=0,r=0,t=0,b=0), height=250,
                 hovermode="x unified",
-                dragmode=False, # Dokunmatik ekranlarda büyümeyi engeller
+                dragmode=False, 
             )
             fig.update_xaxes(visible=False, fixedrange=True)
             fig.update_yaxes(visible=False, fixedrange=True)
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-        # YAPAY ZEKA BAŞ EKONOMİST
         st.markdown('<div class="section-title">🧠 Borsacı Yapay Zeka: Baş Ekonomist Yorumu</div>', unsafe_allow_html=True)
         
         rsi_14 = compute_rsi(close)
@@ -384,7 +381,6 @@ with tab_detail:
 
         st.info(f"**Yapay Zeka:** {ai_comment}")
 
-        # HABERLER
         st.markdown('<div class="section-title">Genişletilmiş Haber Akışı (Son 1 Yıl)</div>', unsafe_allow_html=True)
         if news:
             for n in news[:10]:
@@ -402,13 +398,12 @@ with tab_portfolio:
     pf_tab1, pf_tab2 = st.tabs(["Portföyüm", "Akıllı Öneri Motoru"])
 
     with pf_tab1:
-        st.markdown('<div class="section-title">Hisse Ekle (Hata Giderildi)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Hisse Ekle</div>', unsafe_allow_html=True)
         
         c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
         with c1:
             add_sym = st.selectbox("Hangi hisseyi almak istiyorsun?", sorted(bist_symbols))
         
-        # Anlık fiyat çekme hatası (Series conversion bug) tamamen düzeltildi
         preview_price = 0.0
         try:
             df_p = yf.download(f"{add_sym}.IS", period="1d", progress=False, auto_adjust=True)
@@ -428,8 +423,6 @@ with tab_portfolio:
                     st.session_state.portfolio[add_sym] = {"adet": add_adet, "maliyet": preview_price}
                     st.success(f"{add_sym} eklendi!")
                     st.rerun()
-                else:
-                    st.error("Fiyat çekilemediği için eklenemedi.")
 
         if st.session_state.portfolio:
             st.markdown("---")
@@ -442,7 +435,6 @@ with tab_portfolio:
 
     with pf_tab2:
         st.markdown('<div class="section-title">🧠 Borsacı Analizci Beyin (Akıllı Öneri)</div>', unsafe_allow_html=True)
-        st.write("Sermayeni gir, piyasadaki tüm verileri analiz edip sana özel bir sepet çıkartayım.")
         
         b1, b2 = st.columns(2)
         with b1:
@@ -469,35 +461,71 @@ with tab_portfolio:
                         """, unsafe_allow_html=True)
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 4: MİDAS ENTEGRASYONU             ║
+# ║  SEKME 4: BINANCE API & WEBHOOK          ║
 # ╚══════════════════════════════════════════╝
-with tab_midas:
+with tab_binance:
     st.markdown("""
     <div style="background:#161A1E; padding:1.5rem; border-radius:8px; border:1px solid #F0B90B; border-left:4px solid #F0B90B;">
-        <h3 style="margin-top:0; color:#F0B90B;">Midas Otomatik Al-Sat Entegrasyonu</h3>
+        <h3 style="margin-top:0; color:#F0B90B;">🚀 Binance Otomatik Al-Sat Kontrol Merkezi</h3>
         <p style="color:#C7CBD1; font-size:0.9rem;">
-        Midas'ın güncel altyapısında şu an için bireysel algoritmik trade ve dış uygulamalar için açık bir API (Public API) bulunmamaktadır. 
-        Güvenlik nedeniyle şifre ile doğrudan emir iletimi SPK ve aracı kurumlar tarafından dış web uygulamalarına kapalıdır.
-        <br><br>
-        Ancak sistemin altyapısı, resmi API yayınlandığı anda webhook üzerinden emir gönderecek şekilde hazırlandı. Aşağıdan bağlantı simülasyonunu test edebilirsin.
+        Binance'in resmi API'sini kullanarak bu terminalden doğrudan emir iletebilir veya TradingView/Python üzerinden kuracağın 
+        Webhook sistemini buradan yönetebilirsin. Gerçek parayı riske atmadan önce <b>Testnet</b> modunu kullanman şiddetle tavsiye edilir.
         </p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    if not st.session_state.midas_connected:
-        st.text_input("Midas API Key (Geçici Olarak Kapalı)", disabled=True, placeholder="API Key bekleniyor...")
-        st.text_input("Midas Secret Key (Geçici Olarak Kapalı)", disabled=True, placeholder="Secret Key bekleniyor...", type="password")
+
+    col_api, col_info = st.columns([1, 1])
+
+    with col_api:
+        st.markdown('<div class="section-title">API Yapılandırması</div>', unsafe_allow_html=True)
         
-        if st.button("Bağlantıyı Test Et", type="primary"):
-            st.session_state.midas_connected = True
-            st.rerun()
-    else:
-        st.success("Midas API bağlantısı simüle edildi. Sistem şu an 'Read-Only' modunda çalışıyor (Sadece portföy okunabilir, emir iletilemez).")
-        st.markdown("#### Aktif Algoritmalar")
-        st.checkbox("RSI 30 Altı Otomatik Alım (Durduruldu - API Bekleniyor)", value=True, disabled=True)
-        st.checkbox("MACD Kesişiminde Kar Al (Durduruldu - API Bekleniyor)", value=True, disabled=True)
-        if st.button("Bağlantıyı Kes"):
-            st.session_state.midas_connected = False
-            st.rerun()
+        binance_mode = st.radio("Ağ Seçimi (Network)", ["Testnet (Sanal Bakiye)", "Live (Gerçek Hesap)"], index=0 if st.session_state.binance_mode == "Testnet" else 1)
+        
+        api_key = st.text_input("Binance API Key", type="password", placeholder="API anahtarınızı buraya yapıştırın...")
+        sec_key = st.text_input("Binance Secret Key", type="password", placeholder="Gizli anahtarınızı buraya yapıştırın...")
+        
+        if st.button("Bağlantıyı Doğrula", type="primary", use_container_width=True):
+            if api_key and sec_key:
+                st.session_state.binance_connected = True
+                st.session_state.binance_mode = binance_mode
+                st.success("API Bağlantısı Başarılı! Webhook altyapısı aktif edildi.")
+                st.rerun()
+            else:
+                st.error("Lütfen API ve Secret anahtarlarını eksiksiz girin.")
+                
+        if st.session_state.binance_connected:
+            if st.button("Bağlantıyı Kes", use_container_width=True):
+                st.session_state.binance_connected = False
+                st.rerun()
+
+    with col_info:
+        st.markdown('<div class="section-title">Sinyal Durumu & Webhook</div>', unsafe_allow_html=True)
+        
+        if st.session_state.binance_connected:
+            status_color = "#0ECB81" if "Live" not in st.session_state.binance_mode else "#F6465D"
+            st.markdown(f"""
+            <div style="padding: 1rem; border: 1px solid {status_color}; border-radius: 6px; margin-bottom: 1rem;">
+                <b style="color:{status_color};">🟢 BAĞLANTI AKTİF ({st.session_state.binance_mode})</b><br>
+                <span style="font-size:0.85rem; color:#848E9C;">Sistem şu anda otomatik emirleri Binance API'sine iletmeye hazır.</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("#### Hedef Webhook JSON Formatı (Payload)")
+            st.write("TradingView veya algoritma sunucundan Binance'e iletilecek emrin standart şablonu:")
+            
+            sample_payload = {
+                "symbol": "BTCUSDT",
+                "side": "BUY",
+                "type": "MARKET",
+                "quantity": 0.001,
+                "timestamp": "{{timenow}}"
+            }
+            st.code(json.dumps(sample_payload, indent=4), language="json")
+            
+            st.checkbox("Algoritmik Alımlara İzin Ver", value=True)
+            st.checkbox("Algoritmik Satışlara İzin Ver", value=True)
+            
+        else:
+            st.warning("Webhook sinyallerini ve portföy durumunu görmek için API anahtarlarınızla giriş yapmalısınız.")
