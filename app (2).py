@@ -1,10 +1,9 @@
 """
-Borsa Analiz Uygulaması v12.0 (THE GOD MODE - Hata Düzeltmeli Tam Sürüm)
-- Kayıp Sistemler Geri Döndü (Portföy, AI Motoru, Binance Webhook)
-- Tam Zamanlı Gece/Gündüz (Light/Dark) TV Teması
-- Gelişmiş Screener (Haftalık/Aylık Performans Sütunları)
-- 3'lü TradingView X-Ray Seti (Gelişmiş Grafik, Teknik Kadran)
-- Tablo Markdown (Sekme) Hatası Kökünden Çözüldü
+Borsa Analiz Uygulaması v13.0 (THE GOD MODE - Genişletilmiş & Sessiz Sürüm)
+- Hisse Listesi 160+ Dev BIST Hisselerine Çıkarıldı.
+- Yükleme Bildirimleri (Spinner/Loading) Tamamen Kapatıldı, Grafikler Anında Açılır.
+- TradingView Advanced Chart Üst Menüsü Aktif Edildi (Zaman dilimi seçilebilir).
+- Tam Zamanlı Gece/Gündüz (Light/Dark) TV Teması & Kusursuz Altyapı
 """
 
 import streamlit as st
@@ -68,7 +67,6 @@ html, body, [class*="css"] {{ font-family: -apple-system, BlinkMacSystemFont, "T
 .tv-logo-circle {{ width: 28px; height: 28px; border-radius: 50%; background-color: {blue_brand}; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; flex-shrink: 0; }}
 .tv-ticker-info {{ display: flex; flex-direction: column; justify-content: center; }}
 .tv-ticker-symbol {{ color: {blue_brand}; font-weight: 600; font-size: 14px; text-decoration: none; }}
-.tv-ticker-desc {{ color: {text_muted}; font-size: 11px; margin-top: 2px; }}
 
 .tv-green {{ color: #089981 !important; }}
 .tv-red {{ color: #f23645 !important; }}
@@ -86,13 +84,23 @@ html, body, [class*="css"] {{ font-family: -apple-system, BlinkMacSystemFont, "T
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. VERİ ÇEKME & HESAPLAMA MOTURU
+# 3. VERİ ÇEKME & 160+ HİSSELİK DEV LİSTE
 # ==========================================
 bist_symbols = [
-    "AKBNK","GARAN","ISCTR","YKBNK","VAKBN","KCHOL","SAHOL","DOHOL","ALARK","ENKAI",
-    "EREGL","KRDMD","TUPRS","PETKM","SASA","HEKTS","GUBRF","KOZAL","SISE","CIMSA",
-    "FROTO","TOASO","DOAS","OTKAR","ARCLK","VESTL","THYAO","PGSUS","BIMAS","MGROS",
-    "SOKM","AEFES","CCOLA","TCELL","TTKOM","ASELS","ASTOR","KONTR","ENJSA","AKSEN"
+    "AKBNK","GARAN","ISCTR","YKBNK","VAKBN","HALKB","ALBRK","SKBNK","TSKB","KCHOL",
+    "SAHOL","DOHOL","ALARK","ENKAI","AGHOL","TKFEN","NTHOL","GLYHO","POLHO","TAVHL",
+    "EREGL","KRDMD","TUPRS","PETKM","SASA","HEKTS","GUBRF","KOZAL","KOZAA","IPEKE","ISDMR",
+    "SISE","CIMSA","AKCNS","OYAKC","NUHCM","BTCIM","AFYON","GOLTS","BSOKE","ADANA","MRDIN",
+    "FROTO","TOASO","DOAS","OTKAR","KARSN","ASUZU","TMSN","TTRAK","ARCLK","VESTL","BRISA","GOODY","SARKY",
+    "THYAO","PGSUS","CLEBI","HAVA","ULUSE",
+    "BIMAS","MGROS","SOKM","AEFES","CCOLA","ULKER","TATGD","TUKAS","PNSUT","PETUN","KERVT","BANVT",
+    "TCELL","TTKOM","ASELS","ASTOR","KONTR","ALFAS","KAREL","INDES","NETAS","ARENA","LOGO","DESPC","MIATK","ARZUM","KVK",
+    "ENJSA","AKSEN","ODAS","SMARTG","EUPWR","GESAN","CWENE","YEOTK","GWIND","NATEN","MAGEN","AYDEM","CANTE","ZOREN","AYEN","AKSA",
+    "EKGYO","ISGYO","TRGYO","HLGYO","VKGYO","DZGYO","SNGYO","ZRGYO","PSGYO","RYGYO","ROBIT","HATEK","FLAP","OSAS",
+    "DEVA","SELEC","LKMNH","RTALB","ECILC","KORDS","VESBE","AYGAZ","ALKIM","MAVI","ORGE","OSMEN","KLMSN","ACSEL","PGMT",
+    "KRPLAS","ANGEN","BIOEN","HUBVC","MERIT","INTEM","SNKRN","GEREL","PKART","KCAER","KGYO","MIPAZ","BMEKS",
+    "SUWEN","EBEBK","KZBGY","ENSRI","GENIL","DGNMO","RUBNS","BRLSM","MEDTR","MANAS","KMPUR","ESEN","QUAGR",
+    "CUSAN","YGGYO","KRVGD","TRILC","NTGAZ","MATKS","INFO","GLRYH","GEDIK","IEYHO","IHLGM","IHGZT","IHAAS"
 ]
 TICKERS_BIST = {f"{sym}.IS": sym for sym in bist_symbols}
 
@@ -124,6 +132,7 @@ def get_tv_rating(rsi, curr_p, sma50):
     if score == -1: return "Sat", "rating-sell"
     return "Nötr", "rating-neutral"
 
+# BİLDİRİM ÇIKMAMASI İÇİN show_spinner=False YAPILDI
 @st.cache_data(ttl=300, show_spinner=False)
 def get_macro_data():
     tickers = {"XU100.IS": "BIST 100", "USDTRY=X": "USD/TRY", "EURTRY=X": "EUR/TRY", "GC=F": "ALTIN"}
@@ -139,7 +148,8 @@ def get_macro_data():
         except: res[name] = {"price": 0.0, "chg": 0.0}
     return res
 
-@st.cache_data(ttl=600, show_spinner=True)
+# BİLDİRİM ÇIKMAMASI İÇİN show_spinner=False YAPILDI
+@st.cache_data(ttl=600, show_spinner=False)
 def fetch_tv_screener_data():
     end = datetime.today()
     start = end - timedelta(days=60) # 2 Aylık veri çekimi
@@ -160,7 +170,7 @@ def fetch_tv_screener_data():
             m_pct = ((p_last - p_1m) / p_1m) * 100
             
             vol = float(df["Volume"].squeeze().iloc[-1])
-            sma50 = float(close.rolling(20).mean().iloc[-1]) # Hızlı olması için 20 kullandık
+            sma50 = float(close.rolling(20).mean().iloc[-1])
             rsi = compute_rsi(close)
             rating, rating_cls = get_tv_rating(rsi, p_last, sma50)
             
@@ -181,8 +191,8 @@ def fetch_tv_screener_data():
 # ==========================================
 header_col, theme_col, macro_col = st.columns([1.5, 0.5, 3])
 with header_col:
-    st.markdown(f'<div style="font-size:1.8rem; font-weight:700; color:{text_main}; display:flex; align-items:center; gap:10px;"><span style="color:#2962ff;">B</span> Terminal v12.0</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size:0.75rem; color:#089981;">⚡ THE GOD MODE (TAM SİSTEM)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:1.8rem; font-weight:700; color:{text_main}; display:flex; align-items:center; gap:10px;"><span style="color:#2962ff;">B</span> Terminal v13.0</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:0.75rem; color:#089981;">⚡ THE GOD MODE (GENİŞLETİLMİŞ & SESSİZ)</div>', unsafe_allow_html=True)
 
 with theme_col:
     st.markdown("<br>", unsafe_allow_html=True)
@@ -207,7 +217,7 @@ with macro_col:
 st.markdown(f"<hr style='border-color: {border_color}; margin: 1rem 0;'>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. ANA SEKMELER (SİSTEMLER GERİ DÖNDÜ)
+# 5. ANA SEKMELER
 # ==========================================
 tab_screener, tab_portfolio, tab_ai, tab_binance = st.tabs([
     "📊 TV Screener & X-Ray", "💼 Portföyüm", "🤖 AI & Öneri Motoru", "🚀 Binance API"
@@ -223,9 +233,8 @@ with tab_screener:
     with col_scr:
         df_screener = fetch_tv_screener_data()
         if df_screener.empty:
-            st.error("Veri çekilemedi.")
+            st.error("Piyasa verisi çekilemedi. Lütfen bağlantınızı kontrol edin.")
         else:
-            # HATAYI ÖNLEMEK İÇİN HTML STRING'İ TEK SATIRDA BİRLEŞTİRİYORUZ
             html_table = '<div class="tv-screener-container"><table class="tv-table"><thead><tr><th>TICKER</th><th>SON</th><th>DEĞİŞİM %</th><th>1 HAFTA %</th><th>1 AY %</th><th>TEKNİK SİNYAL</th><th>HACİM</th><th>RSI</th></tr></thead><tbody>'
             
             for _, row in df_screener.sort_values("Değişim %", ascending=False).iterrows():
@@ -250,22 +259,22 @@ with tab_screener:
             html_table += "</tbody></table></div>"
             st.markdown(html_table, unsafe_allow_html=True)
 
-    # --- SAĞ: 3'LÜ X-RAY WIDGET PANELİ ---
+    # --- SAĞ: X-RAY WIDGET PANELİ ---
     with col_xray:
-        secilen_hisse = st.selectbox("X-Ray Röntgeni İçin Hisse Seç:", sorted(bist_symbols), index=0)
+        secilen_hisse = st.selectbox("X-Ray Röntgeni İçin Hisse Seç:", sorted(bist_symbols), index=bist_symbols.index("THYAO") if "THYAO" in bist_symbols else 0)
         tv_symbol = f"BIST:{secilen_hisse}"
         
-        # 1. Advanced Chart
+        # 1. Advanced Chart (hide_top_toolbar false yapıldı, artık zaman dilimi seçilebilir)
         components.html(
             f"""
             <div class="tradingview-widget-container">
               <div id="tradingview_chart"></div>
               <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
               <script type="text/javascript">
-              new TradingView.widget({{"width": "100%", "height": 300, "symbol": "{tv_symbol}", "interval": "D", "timezone": "Europe/Istanbul", "theme": "{tv_theme_str}", "style": "1", "locale": "tr", "hide_top_toolbar": true, "container_id": "tradingview_chart"}});
+              new TradingView.widget({{"width": "100%", "height": 380, "symbol": "{tv_symbol}", "interval": "D", "timezone": "Europe/Istanbul", "theme": "{tv_theme_str}", "style": "1", "locale": "tr", "hide_top_toolbar": false, "container_id": "tradingview_chart"}});
               </script>
             </div>
-            """, height=300, scrolling=False
+            """, height=380, scrolling=False
         )
         
         # 2. Teknik Analiz Kadranı
@@ -294,8 +303,10 @@ with tab_portfolio:
     preview_price = 0.0
     try:
         tkr = yf.Ticker(f"{add_sym}.IS")
-        df_p = tkr.history(period="5d")
-        if not df_p.empty: preview_price = float(df_p["Close"].iloc[-1])
+        try: preview_price = float(tkr.fast_info['lastPrice'])
+        except:
+            df_p = tkr.history(period="5d")
+            if not df_p.empty: preview_price = float(df_p["Close"].iloc[-1])
     except: pass
 
     with c2: st.text_input("Anlık Fiyat", value=f"{preview_price:,.2f}" if preview_price > 0 else "Bulunamadı", disabled=True)
@@ -331,7 +342,7 @@ with tab_ai:
         oneri_btn = st.button("Sepet Oluştur", use_container_width=True, type="primary")
 
     if oneri_btn:
-        with st.spinner("Yapay zeka tüm piyasayı tarıyor, RSI ve momentum hesaplanıyor..."):
+        with st.spinner("Yapay zeka piyasayı tarıyor, sabırlı olun..."):
             df_scan = fetch_tv_screener_data().copy()
             if not df_scan.empty:
                 df_scan = df_scan[df_scan["RSI"] < 45].sort_values("1A %", ascending=True).head(3)
