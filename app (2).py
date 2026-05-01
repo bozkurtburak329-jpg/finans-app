@@ -1,6 +1,6 @@
 """
-Burak Borsa Terminal PRO v10.0 (Unified Edition)
-- Entegre Makine Öğrenmesi (Otomatik Eğitim)
+Burak Borsa Terminal PRO v11.0 (Cloud Native Edition)
+- Sıfır Kütüphane Hatası (Scikit-Learn Kaldırıldı, Saf Algoritma Eklendi)
 - Asenkron Kantitatif Veri Motoru
 - Profesyonel Candlestick Grafikleri
 - Modern Streamlit Arayüzü
@@ -13,7 +13,6 @@ import plotly.graph_objects as go
 import yfinance as yf
 from datetime import datetime, timedelta
 import concurrent.futures
-from sklearn.ensemble import RandomForestClassifier
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -38,7 +37,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if "portfolio" not in st.session_state: st.session_state.portfolio = {}
-if "binance_connected" not in st.session_state: st.session_state.binance_connected = False
 
 # Hızlı tarama için optimize edilmiş BIST listesi
 BIST_SYMBOLS = [
@@ -123,50 +121,41 @@ def fetch_market_snapshot():
     return pd.DataFrame(rows)
 
 # ==========================================
-# 3. YAPAY ZEKA MODELİ (ON-THE-FLY EĞİTİM)
+# 3. KANTİTATİF ALGORİTMİK BEYİN (NO SKLEARN)
 # ==========================================
-@st.cache_resource(show_spinner="Yapay Zeka Modeli Eğitiliyor (Sadece ilk açılışta)...")
-def train_ai_model():
-    """Arka planda dinamik olarak Makine Öğrenmesi modelini eğitir."""
-    all_data = pd.DataFrame()
-    train_symbols = ["THYAO.IS", "KCHOL.IS", "GARAN.IS"] # Eğitim için örneklem
+def algorithmic_ai_decision(price, rsi, ema20, ema50):
+    """
+    Dış kütüphane gerektirmeyen, matematiksel ağırlıklandırma algoritması.
+    Scikit-learn modelinin yaptığı risk/getiri skorlamasını taklit eder.
+    """
+    score = 0
     
-    for sym in train_symbols:
-        df = yf.download(sym, period="1y", progress=False)
-        if df.empty: continue
-        df = calculate_technical_indicators(df)
-        
-        # Hedef: 3 gün sonra fiyat %1.5 artacak mı?
-        df['Gelecek_Fiyat'] = df['Close'].shift(-3)
-        df['Hedef'] = np.where(df['Gelecek_Fiyat'] > (df['Close'] * 1.015), 1, 0)
-        df.dropna(inplace=True)
-        all_data = pd.concat([all_data, df])
-        
-    if all_data.empty: return None
+    # Trend Analizi
+    if price > ema50: score += 2  # Uzun vade pozitif
+    else: score -= 2
     
-    X = all_data[['RSI', 'EMA20', 'EMA50']]
-    y = all_data['Hedef']
+    if ema20 > ema50: score += 1  # Kısa vade ivme pozitif
+    else: score -= 1
     
-    model = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42)
-    model.fit(X, y)
-    return model
-
-ai_model = train_ai_model()
-
-def get_ai_signal(rsi, ema20, ema50):
-    if ai_model is None: return "Veri Yetersiz ⚪"
-    try:
-        features = pd.DataFrame({'RSI': [rsi], 'EMA20': [ema20], 'EMA50': [ema50]})
-        pred = ai_model.predict(features)[0]
-        return "YÜKSELİŞ BEKLENTİSİ 🟢" if pred == 1 else "DÜŞÜŞ RİSKİ 🔴"
-    except:
-        return "HESAPLANAMIYOR ⚪"
+    # RSI Momentum Analizi
+    if rsi < 30: score += 3       # Aşırı satım, fırsat bölgesi
+    elif 30 <= rsi < 45: score += 1 # Toparlanma emaresi
+    elif 45 <= rsi <= 60: score += 0 # Nötr bölge
+    elif 60 < rsi <= 70: score -= 1 # Isınma bölgesi
+    elif rsi > 70: score -= 3     # Aşırı alım, düzeltme riski
+    
+    # Karar Mekanizması
+    if score >= 3: return "GÜÇLÜ YÜKSELİŞ BEKLENTİSİ 🟢"
+    elif 1 <= score < 3: return "YÜKSELİŞ EĞİLİMİ ↗️"
+    elif score == 0: return "YATAY SEYİR (NÖTR) ⚪"
+    elif -2 <= score < 0: return "DÜŞÜŞ EĞİLİMİ ↘️"
+    else: return "GÜÇLÜ DÜŞÜŞ RİSKİ 🔴"
 
 # ==========================================
 # 4. ARAYÜZ (UI)
 # ==========================================
 st.title("Burak Borsa Terminali PRO 🦅")
-st.caption("Kantitatif Sinyal Motoru ve Otonom Yapay Zeka (Self-Trained Model)")
+st.caption("Saf Algoritmik Kantitatif Sinyal Motoru (Cloud-Native)")
 
 # Makro Veriler
 macro_data = fetch_macro_data()
@@ -186,12 +175,12 @@ for col, (name, data) in zip(m_cols, macro_data.items()):
 
 st.write("---")
 
-tab_market, tab_ai, tab_portfolio = st.tabs(["📊 Piyasa Taraması", "🧠 AI Derin Analiz", "💼 Portföy Yönetimi"])
+tab_market, tab_ai, tab_portfolio = st.tabs(["📊 Piyasa Taraması", "🧠 Derin Algoritma Analizi", "💼 Portföy Yönetimi"])
 
 # SEKME 1: PİYASA
 with tab_market:
     st.subheader("BIST Profesyonel Tarama Ekranı")
-    with st.spinner("Piyasa verileri asenkron olarak çekiliyor..."):
+    with st.spinner("Piyasa verileri çekiliyor... (Birkaç saniye sürebilir)"):
         df_market = fetch_market_snapshot()
         
         if not df_market.empty:
@@ -209,13 +198,13 @@ with tab_market:
 
 # SEKME 2: YAPAY ZEKA & GRAFİK
 with tab_ai:
-    st.subheader("Yapay Zeka Odaklı Derin Analiz")
+    st.subheader("Algoritmik Karar Destek Sistemi")
     c1, c2 = st.columns([1, 3])
     
     with c1:
         sel_sym = st.selectbox("Hisse Seçin:", BIST_SYMBOLS)
     
-    with st.spinner(f"{sel_sym} için AI modeli çalıştırılıyor..."):
+    with st.spinner(f"{sel_sym} için algoritmalar hesaplanıyor..."):
         df_hist = yf.download(f"{sel_sym}.IS", period="6mo", progress=False)
         
         if not df_hist.empty:
@@ -225,16 +214,17 @@ with tab_ai:
             ema20_val = float(df_hist['EMA20'].squeeze().iloc[-1])
             ema50_val = float(df_hist['EMA50'].squeeze().iloc[-1])
             
-            ai_decision = get_ai_signal(rsi_val, ema20_val, ema50_val)
+            # SKLEARN YERİNE YENİ ALGORİTMA KULLANILIYOR
+            ai_decision = algorithmic_ai_decision(curr_p, rsi_val, ema20_val, ema50_val)
             
             with c1:
                 st.markdown(f"""
                 <div class="ai-box">
-                    <b>[AI OTONOM RAPOR]</b><br><br>
+                    <b>[ALGORİTMA RAPORU]</b><br><br>
                     <b>Varlık:</b> {sel_sym}<br>
                     <b>Fiyat:</b> {curr_p:.2f} TL<br>
-                    <b>RSI:</b> {rsi_val:.1f}<br><br>
-                    <b>Model Kararı:</b><br>
+                    <b>RSI (14):</b> {rsi_val:.1f}<br><br>
+                    <b>Algoritma Kararı:</b><br>
                     <span style="font-size:1.1rem;font-weight:bold;">{ai_decision}</span>
                 </div>
                 """, unsafe_allow_html=True)
