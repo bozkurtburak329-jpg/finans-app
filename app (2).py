@@ -187,40 +187,268 @@ def fetch_tv_screener_data():
     return pd.DataFrame(rows)
 
 # ==========================================
-# 4. ÜST BAR & TEMA
+# 4. TRADINGVIEW MARKETS TARZI HEADER
 # ==========================================
-header_col, theme_col, macro_col = st.columns([1.5, 0.5, 3])
-with header_col:
-    st.markdown(f'<div style="font-size:1.8rem; font-weight:700; color:{text_main}; display:flex; align-items:center; gap:10px;"><span style="color:#2962ff;">B</span> Terminal v13.0</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size:0.75rem; color:#089981;">⚡ THE GOD MODE (GENİŞLETİLMİŞ & SESSİZ)</div>', unsafe_allow_html=True)
 
-with theme_col:
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.button("☀️" if st.session_state.theme == "dark" else "🌙", on_click=toggle_theme, use_container_width=True)
+macro = get_macro_data()
 
-with macro_col:
-    macro = get_macro_data()
-    cols = st.columns(4)
-    for i, name in enumerate(["BIST 100", "USD/TRY", "EUR/TRY", "ALTIN"]):
-        data = macro.get(name, {"price": 0, "chg": 0})
-        color = "#089981" if data["chg"] >= 0 else "#f23645"
-        sign = "+" if data["chg"] >= 0 else ""
-        fmt = f"{data['price']:,.0f}" if name == "BIST 100" else f"{data['price']:,.2f}"
-        cols[i].markdown(f"""
-        <div class="macro-box">
-            <div class="macro-title">{name}</div>
-            <div class="macro-val">{fmt}</div>
-            <div class="macro-chg" style="color:{color};">{sign}{data["chg"]:.2f}%</div>
+# ── Üst Nav Bar (TradingView tarzı) ───────────────────────────
+theme_icon = "☀️" if st.session_state.theme == "dark" else "🌙"
+nav_col, nav_r = st.columns([5, 1])
+with nav_col:
+    st.markdown(f"""
+    <div style="display:flex; align-items:center; gap:8px; padding: 6px 0 4px 0;">
+        <div style="width:28px;height:28px;border-radius:6px;background:#2962ff;
+        display:flex;align-items:center;justify-content:center;
+        font-weight:900;font-size:15px;color:#fff;">B</div>
+        <span style="font-size:1.1rem;font-weight:700;color:{text_main};letter-spacing:-0.02em;">
+            Burak Borsa</span>
+        <span style="font-size:0.72rem;color:{text_muted};margin-left:6px;
+        font-weight:400;">Türkiye Piyasaları</span>
+    </div>
+    """, unsafe_allow_html=True)
+with nav_r:
+    st.button(theme_icon, on_click=toggle_theme, use_container_width=True)
+
+# ── Canlı Ticker Bandı (tam TV markets tarzı) ─────────────────
+bist_d  = macro.get("BIST 100",  {"price":0,"chg":0})
+usd_d   = macro.get("USD/TRY",   {"price":0,"chg":0})
+eur_d   = macro.get("EUR/TRY",   {"price":0,"chg":0})
+gold_d  = macro.get("ALTIN",     {"price":0,"chg":0})
+
+def ticker_band_item(label, price_str, chg, extra=""):
+    c = "#089981" if chg >= 0 else "#f23645"
+    s = "▲" if chg >= 0 else "▼"
+    return f"""
+    <div style="display:flex;flex-direction:column;padding:10px 18px;
+    border-right:1px solid {border_color};min-width:140px;">
+        <div style="font-size:0.65rem;color:{text_muted};
+        letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">{label}</div>
+        <div style="font-size:1.2rem;font-weight:700;color:{text_main};
+        letter-spacing:-0.02em;line-height:1.1;">{price_str}</div>
+        <div style="font-size:0.78rem;font-weight:600;color:{c};margin-top:2px;">
+            {s} {abs(chg):.2f}%{extra}</div>
+    </div>"""
+
+# BIST 100 büyük göster
+bist_chg_c = "#089981" if bist_d["chg"]>=0 else "#f23645"
+bist_sign  = "▲" if bist_d["chg"]>=0 else "▼"
+
+st.markdown(f"""
+<div style="display:flex;align-items:stretch;background:{card_bg};
+border:1px solid {border_color};border-radius:8px;margin:8px 0 4px 0;overflow:hidden;">
+
+    <!-- BIST 100 büyük -->
+    <div style="display:flex;flex-direction:column;padding:12px 22px;
+    background:{bg_color};border-right:2px solid #2962ff;min-width:180px;">
+        <div style="font-size:0.65rem;color:{text_muted};
+        letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">BIST 100</div>
+        <div style="font-size:1.7rem;font-weight:800;color:{text_main};
+        letter-spacing:-0.03em;line-height:1;">{bist_d['price']:,.1f}</div>
+        <div style="font-size:0.85rem;font-weight:600;color:{bist_chg_c};margin-top:4px;">
+            {bist_sign} {abs(bist_d['chg']):.2f}%
         </div>
-        """, unsafe_allow_html=True)
+    </div>
 
-st.markdown(f"<hr style='border-color: {border_color}; margin: 1rem 0;'>", unsafe_allow_html=True)
+    <!-- Diğer göstergeler -->
+    <div style="display:flex;flex:1;align-items:stretch;overflow-x:auto;">
+        {ticker_band_item("USD / TRY",   f"₺{usd_d['price']:,.4f}",  usd_d['chg'])}
+        {ticker_band_item("EUR / TRY",   f"₺{eur_d['price']:,.4f}",  eur_d['chg'])}
+        {ticker_band_item("ALTIN (XAU)", f"${gold_d['price']:,.1f}", gold_d['chg'])}
+    </div>
+
+    <!-- Saat -->
+    <div style="display:flex;flex-direction:column;justify-content:center;
+    padding:10px 16px;border-left:1px solid {border_color};min-width:90px;text-align:right;">
+        <div style="font-size:0.62rem;color:{text_muted};text-transform:uppercase;
+        letter-spacing:0.08em;">İstanbul</div>
+        <div style="font-size:1rem;font-weight:600;color:{text_main};">
+            {datetime.now().strftime('%H:%M')}</div>
+        <div style="font-size:0.65rem;color:{text_muted};">
+            {datetime.now().strftime('%d.%m.%Y')}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── TradingView Markets Nav Sekmeleri ─────────────────────────
+st.markdown(f"""
+<div style="display:flex;gap:0;border-bottom:2px solid {border_color};
+margin-bottom:14px;margin-top:2px;">
+    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:600;
+    color:#2962ff;border-bottom:2px solid #2962ff;text-decoration:none;
+    margin-bottom:-2px;">Hisseler</a>
+    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
+    color:{text_muted};text-decoration:none;">ETF'ler</a>
+    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
+    color:{text_muted};text-decoration:none;">Döviz</a>
+    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
+    color:{text_muted};text-decoration:none;">Emtialar</a>
+    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
+    color:{text_muted};text-decoration:none;">Kripto</a>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Piyasa Durumu Özetleri (TV Markets'taki kartlar) ──────────
+df_tv = fetch_tv_screener_data()
+
+if not df_tv.empty:
+    rising    = df_tv[df_tv["Değişim %"] > 0]
+    falling   = df_tv[df_tv["Değişim %"] < 0]
+    n_rising  = len(rising)
+    n_falling = len(falling)
+    n_total   = len(df_tv)
+    avg_chg   = df_tv["Değişim %"].mean()
+    top_gainer = df_tv.nlargest(1,"Değişim %").iloc[0] if not df_tv.empty else None
+    top_loser  = df_tv.nsmallest(1,"Değişim %").iloc[0] if not df_tv.empty else None
+
+    pct_rise = int(n_rising/n_total*100) if n_total>0 else 0
+    avg_c    = "#089981" if avg_chg>=0 else "#f23645"
+    avg_s    = "+" if avg_chg>=0 else ""
+
+    # Büyük özet kartlar (TV Markets üst kısmı)
+    mc1,mc2,mc3,mc4,mc5 = st.columns(5)
+
+    mc1.markdown(f"""
+    <div class="macro-box" style="text-align:left;padding:12px 14px;">
+        <div class="macro-title">Toplam Hisse</div>
+        <div class="macro-val" style="font-size:1.4rem;">{n_total}</div>
+        <div style="font-size:0.72rem;color:{text_muted};margin-top:2px;">
+            BIST taranıyor</div>
+    </div>""", unsafe_allow_html=True)
+
+    mc2.markdown(f"""
+    <div class="macro-box" style="text-align:left;padding:12px 14px;
+    border-left:3px solid #089981;">
+        <div class="macro-title">Yükselenler</div>
+        <div class="macro-val" style="font-size:1.4rem;color:#089981;">{n_rising}</div>
+        <div style="font-size:0.72rem;color:#089981;margin-top:2px;">
+            %{pct_rise} hisse</div>
+    </div>""", unsafe_allow_html=True)
+
+    mc3.markdown(f"""
+    <div class="macro-box" style="text-align:left;padding:12px 14px;
+    border-left:3px solid #f23645;">
+        <div class="macro-title">Düşenler</div>
+        <div class="macro-val" style="font-size:1.4rem;color:#f23645;">{n_falling}</div>
+        <div style="font-size:0.72rem;color:#f23645;margin-top:2px;">
+            %{100-pct_rise} hisse</div>
+    </div>""", unsafe_allow_html=True)
+
+    mc4.markdown(f"""
+    <div class="macro-box" style="text-align:left;padding:12px 14px;">
+        <div class="macro-title">Ort. Değişim</div>
+        <div class="macro-val" style="font-size:1.4rem;color:{avg_c};">
+            {avg_s}{avg_chg:.2f}%</div>
+        <div style="font-size:0.72rem;color:{text_muted};margin-top:2px;">
+            Günlük ortalama</div>
+    </div>""", unsafe_allow_html=True)
+
+    if top_gainer is not None:
+        tg_s = "+" if top_gainer["Değişim %"]>=0 else ""
+        mc5.markdown(f"""
+        <div class="macro-box" style="text-align:left;padding:12px 14px;
+        border-left:3px solid #089981;">
+            <div class="macro-title">En Çok Yükselen</div>
+            <div class="macro-val" style="font-size:1.2rem;color:#089981;">
+                {top_gainer['Sembol']}</div>
+            <div style="font-size:0.78rem;color:#089981;margin-top:2px;">
+                {tg_s}{top_gainer['Değişim %']:.2f}%</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    # ── Sektör Isı Haritası (TV Markets Heat Map tarzı) ─────────
+    sektor_map = {
+        "Bankacılık":   ["AKBNK","GARAN","ISCTR","YKBNK","VAKBN","HALKB","ALBRK","SKBNK","TSKB"],
+        "Enerji":       ["ENJSA","AKSEN","ODAS","SMARTG","EUPWR","AYEN","AKSA","ZOREN","CWENE"],
+        "Sanayi":       ["EREGL","KRDMD","ARCLK","VESTL","BRISA","TTRAK","FROTO","TOASO"],
+        "Perakende":    ["BIMAS","MGROS","SOKM","MAVI","KERVT","BANVT"],
+        "Teknoloji":    ["ASELS","TCELL","TTKOM","LOGO","ARENA","KAREL","ASTOR"],
+        "GYO":          ["EKGYO","ISGYO","TRGYO","HLGYO","VKGYO"],
+        "Holding":      ["KCHOL","SAHOL","DOHOL","ENKAI","ALARK","AGHOL"],
+        "Kimya/İlaç":   ["PETKM","SASA","TUPRS","DEVA","SELEC","ECILC"],
+    }
+
+    st.markdown(f"""
+    <div style="font-size:0.85rem;font-weight:600;color:{text_main};
+    margin-bottom:8px;margin-top:4px;">Sektör Performansı</div>""",
+    unsafe_allow_html=True)
+
+    sek_html = f'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
+    for sektor, semboller in sektor_map.items():
+        sektor_data = df_tv[df_tv["Sembol"].isin(semboller)]
+        if sektor_data.empty: continue
+        avg_s_chg = sektor_data["Değişim %"].mean()
+        inten = min(abs(avg_s_chg)/3, 1.0)
+        if avg_s_chg > 0:
+            r,g,b = int(8+inten*30), int(153-inten*20), int(129-inten*30)
+        else:
+            r,g,b = int(242-inten*30), int(54+inten*20), int(69+inten*20)
+        bg_hex = f"rgb({r},{g},{b})"
+        txt_c  = "#ffffff"
+        sign_s = "+" if avg_s_chg>=0 else ""
+        sek_html += f"""
+        <div style="background:{bg_hex};border-radius:6px;padding:10px 14px;
+        min-width:110px;text-align:center;flex:1;">
+            <div style="font-size:0.68rem;color:{txt_c};opacity:0.85;
+            text-transform:uppercase;letter-spacing:0.06em;">{sektor}</div>
+            <div style="font-size:1rem;font-weight:700;color:{txt_c};margin-top:2px;">
+                {sign_s}{avg_s_chg:.2f}%</div>
+            <div style="font-size:0.65rem;color:{txt_c};opacity:0.75;margin-top:1px;">
+                {len(sektor_data)} hisse</div>
+        </div>"""
+    sek_html += "</div>"
+    st.markdown(sek_html, unsafe_allow_html=True)
+
+    # ── En Çok İşlem Görenler (TV Markets Top Movers) ────────────
+    st.markdown(f"""
+    <div style="font-size:0.85rem;font-weight:600;color:{text_main};
+    margin-bottom:8px;">En Çok Değişenler</div>""", unsafe_allow_html=True)
+
+    top5up   = df_tv.nlargest(5,"Değişim %")
+    top5down = df_tv.nsmallest(5,"Değişim %")
+
+    mv1, mv2 = st.columns(2)
+    for col, title, data, color in [
+        (mv1, "🟢 Günün Yükselenleri", top5up,   "#089981"),
+        (mv2, "🔴 Günün Düşenleri",   top5down,  "#f23645"),
+    ]:
+        with col:
+            rows_html = f"""
+            <div style="background:{card_bg};border:1px solid {border_color};
+            border-radius:8px;overflow:hidden;margin-bottom:12px;">
+            <div style="padding:10px 14px;border-bottom:1px solid {border_color};
+            font-size:0.8rem;font-weight:600;color:{color};">{title}</div>"""
+            for _, r in data.iterrows():
+                s = "+" if r["Değişim %"]>=0 else ""
+                rows_html += f"""
+                <div style="display:flex;justify-content:space-between;
+                align-items:center;padding:8px 14px;
+                border-bottom:1px solid {border_color};">
+                    <div>
+                        <div style="font-size:0.85rem;font-weight:600;
+                        color:#2962ff;">{r['Sembol']}</div>
+                        <div style="font-size:0.7rem;color:{text_muted};">
+                            {r['Teknik']}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.85rem;font-weight:600;
+                        color:{text_main};">{r['Fiyat']:,.2f}</div>
+                        <div style="font-size:0.78rem;font-weight:600;
+                        color:{color};">{s}{r['Değişim %']:.2f}%</div>
+                    </div>
+                </div>"""
+            rows_html += "</div>"
+            col.markdown(rows_html, unsafe_allow_html=True)
+
+st.markdown(f"<hr style='border-color:{border_color};margin:4px 0 14px 0;'>",
+            unsafe_allow_html=True)
 
 # ==========================================
 # 5. ANA SEKMELER
 # ==========================================
 tab_screener, tab_portfolio, tab_ai, tab_binance = st.tabs([
-    "📊 TV Screener & X-Ray", "💼 Portföyüm", "🤖 AI & Öneri Motoru", "🚀 Binance API"
+    "📊 Hisse Tarayıcı & Grafik", "💼 Portföyüm", "🤖 AI Öneri Motoru", "🚀 Binance API"
 ])
 
 # ╔══════════════════════════════════════════╗
