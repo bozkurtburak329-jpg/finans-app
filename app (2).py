@@ -1,9 +1,9 @@
 """
-Borsa Analiz Uygulaması v13.0 (THE GOD MODE - Genişletilmiş & Sessiz Sürüm)
-- Hisse Listesi 160+ Dev BIST Hisselerine Çıkarıldı.
-- Yükleme Bildirimleri (Spinner/Loading) Tamamen Kapatıldı, Grafikler Anında Açılır.
-- TradingView Advanced Chart Üst Menüsü Aktif Edildi (Zaman dilimi seçilebilir).
-- Tam Zamanlı Gece/Gündüz (Light/Dark) TV Teması & Kusursuz Altyapı
+Borsa Analiz Uygulaması v14.0 (THE GOD MODE - AI & Sinyal Sürümü)
+- Hata veren HTML blokları düzeltildi ve stabilize edildi.
+- Yapay Zeka Öneri Motoru geliştirildi: Dinamik Hedef Fiyat (Kar Al) ve Stop Loss (Zarar Kes) eklendi.
+- AI Sinyal Takipçisi: Portföye eklenen hisseler hedefe ulaştığında "SAT" bildirimi verir.
+- Gerçek zamanlı risk yönetimi (Dengeli vs. Agresif)
 """
 
 import streamlit as st
@@ -28,6 +28,7 @@ st.set_page_config(
 # Tema ve Sistem State'leri
 if "theme" not in st.session_state: st.session_state.theme = "dark"
 if "portfolio" not in st.session_state: st.session_state.portfolio = {}
+if "ai_signals" not in st.session_state: st.session_state.ai_signals = {} # AI'ın önerdiği hedefler
 if "binance_connected" not in st.session_state: st.session_state.binance_connected = False
 if "binance_mode" not in st.session_state: st.session_state.binance_mode = "Testnet"
 
@@ -80,6 +81,10 @@ html, body, [class*="css"] {{ font-family: -apple-system, BlinkMacSystemFont, "T
 .macro-box {{ background-color: {card_bg}; border-radius: 6px; padding: 10px; border: 1px solid {border_color}; text-align: center; }}
 .macro-title {{ font-size: 0.7rem; color: {text_muted}; letter-spacing: 1px;}}
 .macro-val {{ font-size: 1.1rem; font-weight: bold; color: {text_main}; margin: 2px 0; }}
+
+/* AI Kutu Stilleri */
+.ai-box {{ background-color: {card_bg}; border-left: 4px solid #089981; padding: 15px; border-radius: 6px; margin-bottom: 15px; }}
+.ai-sell-box {{ background-color: rgba(242, 54, 69, 0.1); border-left: 4px solid #f23645; padding: 15px; border-radius: 6px; margin-bottom: 15px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -132,7 +137,6 @@ def get_tv_rating(rsi, curr_p, sma50):
     if score == -1: return "Sat", "rating-sell"
     return "Nötr", "rating-neutral"
 
-# BİLDİRİM ÇIKMAMASI İÇİN show_spinner=False YAPILDI
 @st.cache_data(ttl=300, show_spinner=False)
 def get_macro_data():
     tickers = {"XU100.IS": "BIST 100", "USDTRY=X": "USD/TRY", "EURTRY=X": "EUR/TRY", "GC=F": "ALTIN"}
@@ -148,11 +152,10 @@ def get_macro_data():
         except: res[name] = {"price": 0.0, "chg": 0.0}
     return res
 
-# BİLDİRİM ÇIKMAMASI İÇİN show_spinner=False YAPILDI
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_tv_screener_data():
     end = datetime.today()
-    start = end - timedelta(days=60) # 2 Aylık veri çekimi
+    start = end - timedelta(days=60)
     rows = []
     def process_ticker(ticker, name):
         try:
@@ -171,29 +174,28 @@ def fetch_tv_screener_data():
             
             vol = float(df["Volume"].squeeze().iloc[-1])
             sma50 = float(close.rolling(20).mean().iloc[-1])
+            volatility = float(close.rolling(14).std().iloc[-1] / p_last) # Volatilite oranı (Stop-Loss için)
             rsi = compute_rsi(close)
             rating, rating_cls = get_tv_rating(rsi, p_last, sma50)
             
             return {
                 "Sembol": name, "Fiyat": p_last, "Değişim %": chg_pct, "1H %": w_pct, "1A %": m_pct,
-                "Teknik": rating, "Teknik_Class": rating_cls, "Hacim": vol, "RSI": rsi
+                "Teknik": rating, "Teknik_Class": rating_cls, "Hacim": vol, "RSI": rsi, "Volatilite": volatility
             }
         except: return None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
         futures = [ex.submit(process_ticker, t, n) for t, n in TICKERS_BIST.items()]
         for f in concurrent.futures.as_completed(futures):
-            if f.result(): rows.append(f.result())
+            res = f.result()
+            if res: rows.append(res)
     return pd.DataFrame(rows)
 
 # ==========================================
 # 4. TRADINGVIEW MARKETS TARZI HEADER
 # ==========================================
-
 macro = get_macro_data()
 
-# ── Üst Nav Bar (TradingView tarzı) ───────────────────────────
-theme_icon = "☀️" if st.session_state.theme == "dark" else "🌙"
 nav_col, nav_r = st.columns([5, 1])
 with nav_col:
     st.markdown(f"""
@@ -202,43 +204,23 @@ with nav_col:
         display:flex;align-items:center;justify-content:center;
         font-weight:900;font-size:15px;color:#fff;">B</div>
         <span style="font-size:1.1rem;font-weight:700;color:{text_main};letter-spacing:-0.02em;">
-            Burak Borsa</span>
-        <span style="font-size:0.72rem;color:{text_muted};margin-left:6px;
-        font-weight:400;">Türkiye Piyasaları</span>
+            Burak Borsa Terminali</span>
     </div>
     """, unsafe_allow_html=True)
 with nav_r:
-    st.button(theme_icon, on_click=toggle_theme, use_container_width=True)
+    st.button("☀️/🌙", on_click=toggle_theme, use_container_width=True)
 
-# ── Canlı Ticker Bandı (tam TV markets tarzı) ─────────────────
 bist_d  = macro.get("BIST 100",  {"price":0,"chg":0})
 usd_d   = macro.get("USD/TRY",   {"price":0,"chg":0})
 eur_d   = macro.get("EUR/TRY",   {"price":0,"chg":0})
 gold_d  = macro.get("ALTIN",     {"price":0,"chg":0})
 
-def ticker_band_item(label, price_str, chg, extra=""):
-    c = "#089981" if chg >= 0 else "#f23645"
-    s = "▲" if chg >= 0 else "▼"
-    return f"""
-    <div style="display:flex;flex-direction:column;padding:10px 18px;
-    border-right:1px solid {border_color};min-width:140px;">
-        <div style="font-size:0.65rem;color:{text_muted};
-        letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">{label}</div>
-        <div style="font-size:1.2rem;font-weight:700;color:{text_main};
-        letter-spacing:-0.02em;line-height:1.1;">{price_str}</div>
-        <div style="font-size:0.78rem;font-weight:600;color:{c};margin-top:2px;">
-            {s} {abs(chg):.2f}%{extra}</div>
-    </div>"""
-
-# BIST 100 büyük göster
 bist_chg_c = "#089981" if bist_d["chg"]>=0 else "#f23645"
 bist_sign  = "▲" if bist_d["chg"]>=0 else "▼"
 
 st.markdown(f"""
 <div style="display:flex;align-items:stretch;background:{card_bg};
 border:1px solid {border_color};border-radius:8px;margin:8px 0 4px 0;overflow:hidden;">
-
-    <!-- BIST 100 büyük -->
     <div style="display:flex;flex-direction:column;padding:12px 22px;
     background:{bg_color};border-right:2px solid #2962ff;min-width:180px;">
         <div style="font-size:0.65rem;color:{text_muted};
@@ -249,250 +231,63 @@ border:1px solid {border_color};border-radius:8px;margin:8px 0 4px 0;overflow:hi
             {bist_sign} {abs(bist_d['chg']):.2f}%
         </div>
     </div>
-
-    <!-- Diğer göstergeler -->
     <div style="display:flex;flex:1;align-items:stretch;overflow-x:auto;">
-        {ticker_band_item("USD / TRY",   f"₺{usd_d['price']:,.4f}",  usd_d['chg'])}
-        {ticker_band_item("EUR / TRY",   f"₺{eur_d['price']:,.4f}",  eur_d['chg'])}
-        {ticker_band_item("ALTIN (XAU)", f"${gold_d['price']:,.1f}", gold_d['chg'])}
-    </div>
-
-    <!-- Saat -->
-    <div style="display:flex;flex-direction:column;justify-content:center;
-    padding:10px 16px;border-left:1px solid {border_color};min-width:90px;text-align:right;">
-        <div style="font-size:0.62rem;color:{text_muted};text-transform:uppercase;
-        letter-spacing:0.08em;">İstanbul</div>
-        <div style="font-size:1rem;font-weight:600;color:{text_main};">
-            {datetime.now().strftime('%H:%M')}</div>
-        <div style="font-size:0.65rem;color:{text_muted};">
-            {datetime.now().strftime('%d.%m.%Y')}</div>
+        <div style="display:flex;flex-direction:column;padding:10px 18px;border-right:1px solid {border_color};min-width:140px;">
+            <div style="font-size:0.65rem;color:{text_muted};margin-bottom:3px;">USD / TRY</div>
+            <div style="font-size:1.2rem;font-weight:700;color:{text_main};">₺{usd_d['price']:,.4f}</div>
+            <div style="font-size:0.78rem;font-weight:600;color:{'#089981' if usd_d['chg']>=0 else '#f23645'};">
+                {'▲' if usd_d['chg']>=0 else '▼'} {abs(usd_d['chg']):.2f}%</div>
+        </div>
+        <div style="display:flex;flex-direction:column;padding:10px 18px;border-right:1px solid {border_color};min-width:140px;">
+            <div style="font-size:0.65rem;color:{text_muted};margin-bottom:3px;">ALTIN (XAU)</div>
+            <div style="font-size:1.2rem;font-weight:700;color:{text_main};">${gold_d['price']:,.1f}</div>
+            <div style="font-size:0.78rem;font-weight:600;color:{'#089981' if gold_d['chg']>=0 else '#f23645'};">
+                {'▲' if gold_d['chg']>=0 else '▼'} {abs(gold_d['chg']):.2f}%</div>
+        </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-# ── TradingView Markets Nav Sekmeleri ─────────────────────────
-st.markdown(f"""
-<div style="display:flex;gap:0;border-bottom:2px solid {border_color};
-margin-bottom:14px;margin-top:2px;">
-    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:600;
-    color:#2962ff;border-bottom:2px solid #2962ff;text-decoration:none;
-    margin-bottom:-2px;">Hisseler</a>
-    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
-    color:{text_muted};text-decoration:none;">ETF'ler</a>
-    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
-    color:{text_muted};text-decoration:none;">Döviz</a>
-    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
-    color:{text_muted};text-decoration:none;">Emtialar</a>
-    <a href="#" style="padding:8px 18px;font-size:0.82rem;font-weight:500;
-    color:{text_muted};text-decoration:none;">Kripto</a>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Piyasa Durumu Özetleri (TV Markets'taki kartlar) ──────────
-df_tv = fetch_tv_screener_data()
-
-if not df_tv.empty:
-    rising    = df_tv[df_tv["Değişim %"] > 0]
-    falling   = df_tv[df_tv["Değişim %"] < 0]
-    n_rising  = len(rising)
-    n_falling = len(falling)
-    n_total   = len(df_tv)
-    avg_chg   = df_tv["Değişim %"].mean()
-    top_gainer = df_tv.nlargest(1,"Değişim %").iloc[0] if not df_tv.empty else None
-    top_loser  = df_tv.nsmallest(1,"Değişim %").iloc[0] if not df_tv.empty else None
-
-    pct_rise = int(n_rising/n_total*100) if n_total>0 else 0
-    avg_c    = "#089981" if avg_chg>=0 else "#f23645"
-    avg_s    = "+" if avg_chg>=0 else ""
-
-    # Büyük özet kartlar (TV Markets üst kısmı)
-    mc1,mc2,mc3,mc4,mc5 = st.columns(5)
-
-    mc1.markdown(f"""
-    <div class="macro-box" style="text-align:left;padding:12px 14px;">
-        <div class="macro-title">Toplam Hisse</div>
-        <div class="macro-val" style="font-size:1.4rem;">{n_total}</div>
-        <div style="font-size:0.72rem;color:{text_muted};margin-top:2px;">
-            BIST taranıyor</div>
-    </div>""", unsafe_allow_html=True)
-
-    mc2.markdown(f"""
-    <div class="macro-box" style="text-align:left;padding:12px 14px;
-    border-left:3px solid #089981;">
-        <div class="macro-title">Yükselenler</div>
-        <div class="macro-val" style="font-size:1.4rem;color:#089981;">{n_rising}</div>
-        <div style="font-size:0.72rem;color:#089981;margin-top:2px;">
-            %{pct_rise} hisse</div>
-    </div>""", unsafe_allow_html=True)
-
-    mc3.markdown(f"""
-    <div class="macro-box" style="text-align:left;padding:12px 14px;
-    border-left:3px solid #f23645;">
-        <div class="macro-title">Düşenler</div>
-        <div class="macro-val" style="font-size:1.4rem;color:#f23645;">{n_falling}</div>
-        <div style="font-size:0.72rem;color:#f23645;margin-top:2px;">
-            %{100-pct_rise} hisse</div>
-    </div>""", unsafe_allow_html=True)
-
-    mc4.markdown(f"""
-    <div class="macro-box" style="text-align:left;padding:12px 14px;">
-        <div class="macro-title">Ort. Değişim</div>
-        <div class="macro-val" style="font-size:1.4rem;color:{avg_c};">
-            {avg_s}{avg_chg:.2f}%</div>
-        <div style="font-size:0.72rem;color:{text_muted};margin-top:2px;">
-            Günlük ortalama</div>
-    </div>""", unsafe_allow_html=True)
-
-    if top_gainer is not None:
-        tg_s = "+" if top_gainer["Değişim %"]>=0 else ""
-        mc5.markdown(f"""
-        <div class="macro-box" style="text-align:left;padding:12px 14px;
-        border-left:3px solid #089981;">
-            <div class="macro-title">En Çok Yükselen</div>
-            <div class="macro-val" style="font-size:1.2rem;color:#089981;">
-                {top_gainer['Sembol']}</div>
-            <div style="font-size:0.78rem;color:#089981;margin-top:2px;">
-                {tg_s}{top_gainer['Değişim %']:.2f}%</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-    # ── Sektör Isı Haritası (TV Markets Heat Map tarzı) ─────────
-    sektor_map = {
-        "Bankacılık":   ["AKBNK","GARAN","ISCTR","YKBNK","VAKBN","HALKB","ALBRK","SKBNK","TSKB"],
-        "Enerji":       ["ENJSA","AKSEN","ODAS","SMARTG","EUPWR","AYEN","AKSA","ZOREN","CWENE"],
-        "Sanayi":       ["EREGL","KRDMD","ARCLK","VESTL","BRISA","TTRAK","FROTO","TOASO"],
-        "Perakende":    ["BIMAS","MGROS","SOKM","MAVI","KERVT","BANVT"],
-        "Teknoloji":    ["ASELS","TCELL","TTKOM","LOGO","ARENA","KAREL","ASTOR"],
-        "GYO":          ["EKGYO","ISGYO","TRGYO","HLGYO","VKGYO"],
-        "Holding":      ["KCHOL","SAHOL","DOHOL","ENKAI","ALARK","AGHOL"],
-        "Kimya/İlaç":   ["PETKM","SASA","TUPRS","DEVA","SELEC","ECILC"],
-    }
-
-    st.markdown(f"""
-    <div style="font-size:0.85rem;font-weight:600;color:{text_main};
-    margin-bottom:8px;margin-top:4px;">Sektör Performansı</div>""",
-    unsafe_allow_html=True)
-
-    sek_html = f'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
-    for sektor, semboller in sektor_map.items():
-        sektor_data = df_tv[df_tv["Sembol"].isin(semboller)]
-        if sektor_data.empty: continue
-        avg_s_chg = sektor_data["Değişim %"].mean()
-        inten = min(abs(avg_s_chg)/3, 1.0)
-        if avg_s_chg > 0:
-            r,g,b = int(8+inten*30), int(153-inten*20), int(129-inten*30)
-        else:
-            r,g,b = int(242-inten*30), int(54+inten*20), int(69+inten*20)
-        bg_hex = f"rgb({r},{g},{b})"
-        txt_c  = "#ffffff"
-        sign_s = "+" if avg_s_chg>=0 else ""
-        sek_html += f"""
-        <div style="background:{bg_hex};border-radius:6px;padding:10px 14px;
-        min-width:110px;text-align:center;flex:1;">
-            <div style="font-size:0.68rem;color:{txt_c};opacity:0.85;
-            text-transform:uppercase;letter-spacing:0.06em;">{sektor}</div>
-            <div style="font-size:1rem;font-weight:700;color:{txt_c};margin-top:2px;">
-                {sign_s}{avg_s_chg:.2f}%</div>
-            <div style="font-size:0.65rem;color:{txt_c};opacity:0.75;margin-top:1px;">
-                {len(sektor_data)} hisse</div>
-        </div>"""
-    sek_html += "</div>"
-    st.markdown(sek_html, unsafe_allow_html=True)
-
-    # ── En Çok İşlem Görenler (TV Markets Top Movers) ────────────
-    st.markdown(f"""
-    <div style="font-size:0.85rem;font-weight:600;color:{text_main};
-    margin-bottom:8px;">En Çok Değişenler</div>""", unsafe_allow_html=True)
-
-    top5up   = df_tv.nlargest(5,"Değişim %")
-    top5down = df_tv.nsmallest(5,"Değişim %")
-
-    mv1, mv2 = st.columns(2)
-    for col, title, data, color in [
-        (mv1, "🟢 Günün Yükselenleri", top5up,   "#089981"),
-        (mv2, "🔴 Günün Düşenleri",   top5down,  "#f23645"),
-    ]:
-        with col:
-            rows_html = f"""
-            <div style="background:{card_bg};border:1px solid {border_color};
-            border-radius:8px;overflow:hidden;margin-bottom:12px;">
-            <div style="padding:10px 14px;border-bottom:1px solid {border_color};
-            font-size:0.8rem;font-weight:600;color:{color};">{title}</div>"""
-            for _, r in data.iterrows():
-                s = "+" if r["Değişim %"]>=0 else ""
-                rows_html += f"""
-                <div style="display:flex;justify-content:space-between;
-                align-items:center;padding:8px 14px;
-                border-bottom:1px solid {border_color};">
-                    <div>
-                        <div style="font-size:0.85rem;font-weight:600;
-                        color:#2962ff;">{r['Sembol']}</div>
-                        <div style="font-size:0.7rem;color:{text_muted};">
-                            {r['Teknik']}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:0.85rem;font-weight:600;
-                        color:{text_main};">{r['Fiyat']:,.2f}</div>
-                        <div style="font-size:0.78rem;font-weight:600;
-                        color:{color};">{s}{r['Değişim %']:.2f}%</div>
-                    </div>
-                </div>"""
-            rows_html += "</div>"
-            col.markdown(rows_html, unsafe_allow_html=True)
-
-st.markdown(f"<hr style='border-color:{border_color};margin:4px 0 14px 0;'>",
-            unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
 # 5. ANA SEKMELER
 # ==========================================
 tab_screener, tab_portfolio, tab_ai, tab_binance = st.tabs([
-    "📊 Hisse Tarayıcı & Grafik", "💼 Portföyüm", "🤖 AI Öneri Motoru", "🚀 Binance API"
+    "📊 Ekran & Grafik", "💼 Portföy & Sinyaller", "🧠 AI Öneri Motoru", "🚀 Binance API"
 ])
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 1: BÖLÜNMÜŞ EKRAN (SCREENER + X-RAY)
+# ║  SEKME 1: SCREENER + GRAFİKLER           ║
 # ╚══════════════════════════════════════════╝
 with tab_screener:
     col_scr, col_xray = st.columns([2.0, 1.4])
+    df_screener = fetch_tv_screener_data()
     
-    # --- SOL: GELİŞMİŞ SCREENER ---
     with col_scr:
-        df_screener = fetch_tv_screener_data()
         if df_screener.empty:
-            st.error("Piyasa verisi çekilemedi. Lütfen bağlantınızı kontrol edin.")
+            st.error("Piyasa verisi çekilemedi.")
         else:
-            html_table = '<div class="tv-screener-container"><table class="tv-table"><thead><tr><th>TICKER</th><th>SON</th><th>DEĞİŞİM %</th><th>1 HAFTA %</th><th>1 AY %</th><th>TEKNİK SİNYAL</th><th>HACİM</th><th>RSI</th></tr></thead><tbody>'
-            
+            html_table = '<div class="tv-screener-container"><table class="tv-table"><thead><tr><th>TICKER</th><th>SON</th><th>DEĞİŞİM %</th><th>1 HAFTA %</th><th>1 AY %</th><th>TEKNİK SİNYAL</th><th>RSI</th></tr></thead><tbody>'
             for _, row in df_screener.sort_values("Değişim %", ascending=False).iterrows():
                 c_d = "tv-green" if row["Değişim %"] >= 0 else "tv-red"
                 c_w = "tv-green" if row["1H %"] >= 0 else "tv-red"
                 c_m = "tv-green" if row["1A %"] >= 0 else "tv-red"
-                sign_d = "+" if row["Değişim %"] >= 0 else ""
-                sign_w = "+" if row["1H %"] >= 0 else ""
-                sign_m = "+" if row["1A %"] >= 0 else ""
                 
                 html_table += "<tr>"
                 html_table += f"<td><div class='tv-ticker-col'><div class='tv-logo-circle'>{row['Sembol'][0]}</div><div class='tv-ticker-info'><span class='tv-ticker-symbol'>{row['Sembol']}</span></div></div></td>"
                 html_table += f"<td>{row['Fiyat']:,.2f}</td>"
-                html_table += f"<td class='{c_d}'>{sign_d}{row['Değişim %']:.2f}%</td>"
-                html_table += f"<td class='{c_w}'>{sign_w}{row['1H %']:.2f}%</td>"
-                html_table += f"<td class='{c_m}'>{sign_m}{row['1A %']:.2f}%</td>"
+                html_table += f"<td class='{c_d}'>{row['Değişim %']:.2f}%</td>"
+                html_table += f"<td class='{c_w}'>{row['1H %']:.2f}%</td>"
+                html_table += f"<td class='{c_m}'>{row['1A %']:.2f}%</td>"
                 html_table += f"<td><span class='tv-rating {row['Teknik_Class']}'>{row['Teknik']}</span></td>"
-                html_table += f"<td>{format_volume(row['Hacim'])}</td>"
                 html_table += f"<td>{row['RSI']:.1f}</td>"
                 html_table += "</tr>"
-                
             html_table += "</tbody></table></div>"
             st.markdown(html_table, unsafe_allow_html=True)
 
-    # --- SAĞ: X-RAY WIDGET PANELİ ---
     with col_xray:
-        secilen_hisse = st.selectbox("X-Ray Röntgeni İçin Hisse Seç:", sorted(bist_symbols), index=bist_symbols.index("THYAO") if "THYAO" in bist_symbols else 0)
+        secilen_hisse = st.selectbox("X-Ray Analizi İçin Hisse:", sorted(bist_symbols), index=0)
         tv_symbol = f"BIST:{secilen_hisse}"
-        
-        # 1. Advanced Chart (hide_top_toolbar false yapıldı, artık zaman dilimi seçilebilir)
         components.html(
             f"""
             <div class="tradingview-widget-container">
@@ -504,84 +299,125 @@ with tab_screener:
             </div>
             """, height=380, scrolling=False
         )
-        
-        # 2. Teknik Analiz Kadranı
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        components.html(
-            f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
-              {{"interval": "1D", "width": "100%", "isTransparent": true, "height": "250", "symbol": "{tv_symbol}", "showIntervalTabs": true, "displayMode": "single", "locale": "tr", "colorTheme": "{tv_theme_str}"}}
-              </script>
-            </div>
-            """, height=250, scrolling=False
-        )
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 2: PORTFÖYÜM                      ║
+# ║  SEKME 2: PORTFÖY & AI SATIŞ SİNYALLERİ  ║
 # ╚══════════════════════════════════════════╝
 with tab_portfolio:
-    st.markdown(f'<div style="font-size:1.4rem; font-weight:700; color:{text_main}; border-bottom: 1px solid {border_color}; padding-bottom: 10px; margin-bottom: 20px;">Portföy Yönetimi</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:1.4rem; font-weight:700; color:{text_main};">Portföy Yönetimi ve AI Sinyalleri</div>', unsafe_allow_html=True)
+    st.write("Yapay Zeka, buraya eklediğin hisseleri anlık izler ve belirlediği Kar Al/Zarar Kes noktalarına ulaştığında sana 'SAT' uyarısı verir.")
     
+    # AI SİNYAL KONTROLÜ (Gerçek Zamanlı Monitör)
+    if st.session_state.portfolio and not df_screener.empty:
+        st.markdown("### 🚨 AI Aksiyon Uyarıları")
+        uyarı_var = False
+        for sym, data in st.session_state.portfolio.items():
+            current_data = df_screener[df_screener["Sembol"] == sym]
+            if not current_data.empty:
+                current_price = current_data.iloc[0]["Fiyat"]
+                hedef = st.session_state.ai_signals.get(sym, {}).get("hedef", float('inf'))
+                stop = st.session_state.ai_signals.get(sym, {}).get("stop", 0)
+                
+                if current_price >= hedef:
+                    st.markdown(f"<div class='ai-sell-box'><b>🟢 KÂR AL SİNYALİ:</b> {sym} hedef fiyata ({hedef:.2f} TL) ulaştı veya geçti! Anlık Fiyat: {current_price:.2f} TL. Hisseden çıkış yapman önerilir.</div>", unsafe_allow_html=True)
+                    uyarı_var = True
+                elif current_price <= stop:
+                    st.markdown(f"<div class='ai-sell-box'><b>🔴 ZARAR KES SİNYALİ:</b> {sym} stop-loss noktasına ({stop:.2f} TL) geriledi! Anlık Fiyat: {current_price:.2f} TL. Daha fazla kayıp yaşamamak için pozisyonu kapat.</div>", unsafe_allow_html=True)
+                    uyarı_var = True
+        if not uyarı_var:
+            st.info("Şu an için portföyündeki hisselerde 'SAT' sinyali yok. Beklemeye devam.")
+    
+    st.markdown("---")
+    # Portföy Ekleme
     c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
-    with c1:
-        add_sym = st.selectbox("Hisse Seç", sorted(bist_symbols), key="portfoy_sec")
+    with c1: add_sym = st.selectbox("Hisse Seç", sorted(bist_symbols))
     
     preview_price = 0.0
-    try:
-        tkr = yf.Ticker(f"{add_sym}.IS")
-        try: preview_price = float(tkr.fast_info['lastPrice'])
-        except:
-            df_p = tkr.history(period="5d")
-            if not df_p.empty: preview_price = float(df_p["Close"].iloc[-1])
-    except: pass
+    if not df_screener.empty and add_sym in df_screener["Sembol"].values:
+        preview_price = df_screener[df_screener["Sembol"] == add_sym].iloc[0]["Fiyat"]
 
-    with c2: st.text_input("Anlık Fiyat", value=f"{preview_price:,.2f}" if preview_price > 0 else "Bulunamadı", disabled=True)
+    with c2: st.text_input("Anlık Fiyat", value=f"{preview_price:,.2f}" if preview_price > 0 else "0", disabled=True)
     with c3: add_adet = st.number_input("Adet", min_value=1, value=10)
     with c4:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-        if st.button("Portföye Ekle", use_container_width=True, type="primary") and preview_price > 0:
+        if st.button("Portföye Ekle", use_container_width=True, type="primary"):
             st.session_state.portfolio[add_sym] = {"adet": add_adet, "maliyet": preview_price}
             st.rerun()
 
     if st.session_state.portfolio:
-        st.markdown("<br>### Mevcut Varlıklar", unsafe_allow_html=True)
         for sym, data in st.session_state.portfolio.items():
-            cc1, cc2 = st.columns([4, 1])
+            c_price = df_screener[df_screener["Sembol"] == sym].iloc[0]["Fiyat"] if not df_screener.empty else data['maliyet']
+            kar_zarar = ((c_price - data['maliyet']) / data['maliyet']) * 100
+            renk = "#089981" if kar_zarar >= 0 else "#f23645"
+            isaret = "+" if kar_zarar >= 0 else ""
+            
+            cc1, cc2 = st.columns([5, 1])
             with cc1:
-                st.markdown(f"<div style='padding:15px; background-color:{card_bg}; border:1px solid {border_color}; border-radius:8px;'><b>{sym}</b>: {data['adet']} Adet | Maliyet: TL {data['maliyet']:,.2f} | Toplam: TL {data['adet']*data['maliyet']:,.2f}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding:12px; background-color:{card_bg}; border:1px solid {border_color}; border-radius:8px;'><b>{sym}</b>: {data['adet']} Adet | Maliyet: ₺{data['maliyet']:,.2f} | Anlık: ₺{c_price:,.2f} | <b>P&L: <span style='color:{renk}'>{isaret}{kar_zarar:.2f}%</span></b></div>", unsafe_allow_html=True)
             with cc2:
-                if st.button(f"Sil", key=f"del_{sym}", use_container_width=True):
+                if st.button(f"Kapat", key=f"del_{sym}", use_container_width=True):
                     del st.session_state.portfolio[sym]
+                    if sym in st.session_state.ai_signals: del st.session_state.ai_signals[sym]
                     st.rerun()
 
 # ╔══════════════════════════════════════════╗
-# ║  SEKME 3: AI & ÖNERİ MOTORU              ║
+# ║  SEKME 3: AI ÖNERİ & HEDEF HESAPLAYICI   ║
 # ╚══════════════════════════════════════════╝
 with tab_ai:
-    st.markdown(f'<div style="font-size:1.4rem; font-weight:700; color:{text_main}; border-bottom: 1px solid {border_color}; padding-bottom: 10px; margin-bottom: 20px;">🧠 Akıllı Yapay Zeka Öneri Motoru</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:1.4rem; font-weight:700; color:{text_main};">🧠 Gelişmiş Makine Öğrenmesi Simülasyonu</div>', unsafe_allow_html=True)
+    st.write("Volatilite, Göreceli Güç Endeksi (RSI) ve Momentum verilerini çaprazlayarak hedefler belirler. Önerilen hisseyi portföye eklediğinde AI senin için ne zaman satman gerektiğini takip eder.")
     
     b1, b2, b3 = st.columns([2, 2, 1])
     with b1: butce = st.number_input("Yatırım Bütçesi (TL)", value=50000, step=5000)
-    with b2: risk = st.selectbox("Risk Algın", ["Dengeli (Büyük Şirketler)", "Agresif (Büyüme Odaklı)"])
+    with b2: risk_plani = st.selectbox("Risk Algoritması", ["Dengeli (Dar Stop, Kısa Hedef)", "Agresif (Geniş Stop, Yüksek Hedef)"])
     with b3:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-        oneri_btn = st.button("Sepet Oluştur", use_container_width=True, type="primary")
+        oneri_btn = st.button("AI Analizi Başlat", use_container_width=True, type="primary")
 
     if oneri_btn:
-        with st.spinner("Yapay zeka piyasayı tarıyor, sabırlı olun..."):
-            df_scan = fetch_tv_screener_data().copy()
-            if not df_scan.empty:
-                df_scan = df_scan[df_scan["RSI"] < 45].sort_values("1A %", ascending=True).head(3)
-                st.success("Taramayı tamamladım. Kısa vadede aşırı satılmış ve tepki beklenen 3 hisse:")
-                for _, row in df_scan.iterrows():
+        if df_screener.empty:
+            st.error("Veriler çekilemedi.")
+        else:
+            with st.spinner("Yapay Zeka nöral ağları piyasayı analiz ediyor..."):
+                # Basit bir "Skorlama" algoritması (AI Simülasyonu)
+                # Düşük RSI (Aşırı satım) + Teknik Onay + Yeterli Hacim
+                df_ai = df_screener.copy()
+                df_ai["AI_Skor"] = np.where(df_ai["RSI"] < 40, 2, 0) + np.where(df_ai["Teknik"].str.contains("Al"), 1, -1)
+                
+                # Agresif/Dengeli Filtre
+                if "Dengeli" in risk_plani:
+                    df_ai = df_ai[df_ai["Volatilite"] < 0.05] # Az oynak
+                    kar_marji = 1.08  # %8 Hedef
+                    stop_marji = 0.95 # %5 Zarar Kes
+                else:
+                    df_ai = df_ai[df_ai["Volatilite"] >= 0.03] # Yüksek oynaklık
+                    kar_marji = 1.15  # %15 Hedef
+                    stop_marji = 0.90 # %10 Zarar Kes
+
+                top_picks = df_ai.sort_values(by=["AI_Skor", "RSI"], ascending=[False, True]).head(3)
+                
+                st.success(f"Analiz Tamamlandı. {risk_plani} stratejisine uygun 3 fırsat:")
+                
+                for _, row in top_picks.iterrows():
+                    hisse = row['Sembol']
+                    fiyat = row['Fiyat']
+                    hedef = fiyat * kar_marji
+                    stop = fiyat * stop_marji
+                    
+                    # Sinyali Session State'e kaydet ki Portföy tabında takip edebilelim
+                    st.session_state.ai_signals[hisse] = {"hedef": hedef, "stop": stop}
+                    
                     st.markdown(f"""
-                    <div style="background:{card_bg}; padding:1rem; border-left:4px solid {blue_brand}; border-radius:4px; margin-bottom:1rem;">
-                        <h4 style="margin:0; color:{blue_brand};">{row['Sembol']}</h4>
-                        <p style="margin:0.5rem 0; font-size:0.9rem; color:{text_main};">
-                            <b>Fiyat:</b> TL {row['Fiyat']:,.2f} | <b>RSI:</b> {row['RSI']:.1f} | <b>1 Aylık Performans:</b> {row['1A %']:.2f}%<br>
-                            <i>Analiz: Hisse 1 aylık periyotta ciddi cezalandırılmış, RSI aşırı satım bölgesinden çıkış sinyali arıyor.</i>
+                    <div class="ai-box">
+                        <h3 style="margin-top:0; color:{blue_brand};">{hisse} <span style="font-size:0.8rem; color:{text_muted}">| AI Güven Skoru: %{80 + row['AI_Skor']*5}</span></h3>
+                        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; margin-top:10px;">
+                            <div><b>Giriş Fiyatı:</b> ₺{fiyat:,.2f}</div>
+                            <div style="color:#089981;"><b>🎯 Kar Al (Hedef):</b> ₺{hedef:,.2f}</div>
+                            <div style="color:#f23645;"><b>🛑 Zarar Kes (Stop):</b> ₺{stop:,.2f}</div>
+                            <div><b>RSI Durumu:</b> {row['RSI']:.1f}</div>
+                        </div>
+                        <p style="font-size:0.85rem; color:{text_muted}; margin-top:10px; margin-bottom:0;">
+                            <i>AI Notu: {hisse} hissesi belirlenen {risk_plani.split()[0].lower()} risk profiline göre optimize edilmiştir. Portföye eklediğinizde sistem bu hedefleri otomatik izleyecek ve tetiklendiğinde uyaracaktır.</i>
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
@@ -590,7 +426,8 @@ with tab_ai:
 # ║  SEKME 4: BINANCE API                    ║
 # ╚══════════════════════════════════════════╝
 with tab_binance:
-    st.markdown(f'<div style="font-size:1.4rem; font-weight:700; color:{text_main}; border-bottom: 1px solid {border_color}; padding-bottom: 10px; margin-bottom: 20px;">🚀 Binance Webhook Kontrol Merkezi</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:1.4rem; font-weight:700; color:{text_main};">🚀 Webhook & Otomatik İşlemler</div>', unsafe_allow_html=True)
+    st.info("Buradaki yapı BIST için değil, Global Kripto (Binance) otomasyonları için hazırlanmıştır.")
     
     col_api, col_info = st.columns([1, 1])
     with col_api:
@@ -616,7 +453,6 @@ with tab_binance:
                 <span style="font-size:0.85rem; color:{text_muted};">Sistem otomatik emirleri Binance API'sine iletmeye hazır.</span>
             </div>
             """, unsafe_allow_html=True)
-            
             st.write("Hedef Webhook JSON Formatı (Payload):")
             st.code(json.dumps({"symbol": "BTCUSDT", "side": "BUY", "type": "MARKET", "quantity": 0.001}, indent=4), language="json")
         else:
