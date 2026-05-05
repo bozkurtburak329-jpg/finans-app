@@ -269,11 +269,13 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # TradingView Kayan Ticker (async widget)
-components.html(f"""
+ticker_tape_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:transparent;}}</style>
+</head><body>
 <div class="tradingview-widget-container" style="height:46px;">
   <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript"
-    src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js">
   {{
     "symbols":[
       {{"proName":"BIST:XU100","title":"BIST 100"}},
@@ -293,7 +295,8 @@ components.html(f"""
   }}
   </script>
 </div>
-""", height=52, scrolling=False)
+</body></html>"""
+components.html(ticker_tape_html, height=52, scrolling=False)
 
 # ==========================================
 # 4. ANA SEKMELER (6 DEV SEKME)
@@ -314,18 +317,30 @@ with tab_overview:
     col_heat, col_hot = st.columns([2.5, 1.5])
     with col_heat:
         st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:5px;">BIST Isı Haritası</div>', unsafe_allow_html=True)
-        components.html(f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript"
-                src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
-              {{
-                "exchanges":["BIST"],"dataSource":"XU100","grouping":"sector",
-                "blockSize":"market_cap_basic","blockColor":"change","locale":"tr",
-                "colorTheme":"{tv_theme}","hasTopBar":true,"width":"100%","height":"520"
-              }}
-              </script>
-            </div>""", height=540)
+        heatmap_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:520px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:520px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js">
+  {{
+    "exchanges":["BIST"],
+    "dataSource":"XU100",
+    "grouping":"sector",
+    "blockSize":"market_cap_basic",
+    "blockColor":"change",
+    "locale":"tr",
+    "colorTheme":"{tv_theme}",
+    "hasTopBar":true,
+    "isTransparent":false,
+    "width":"100%",
+    "height":"520"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(heatmap_html, height=540, scrolling=False)
 
         # Sektör özet satırı
         if not df_data.empty and secilen_piyasa == "BIST 100":
@@ -361,33 +376,50 @@ with tab_overview:
 
     with col_hot:
         st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:5px;">Günün Hareketlileri</div>', unsafe_allow_html=True)
-        components.html(f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript"
-                src="https://s3.tradingview.com/external-embedding/embed-widget-hotlists.js" async>
-              {{
-                "colorTheme":"{tv_theme}","exchange":"BIST","showChart":true,
-                "locale":"tr","width":"100%","height":"520","isTransparent":true
-              }}
-              </script>
-            </div>""", height=540)
+        hotlist_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:400px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:400px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-hotlists.js">
+  {{
+    "colorTheme":"{tv_theme}",
+    "exchange":"BIST",
+    "showChart":false,
+    "locale":"tr",
+    "width":"100%",
+    "height":"400",
+    "isTransparent":false
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(hotlist_html, height=420, scrolling=False)
 
-        # En çok yükselenler / düşenler (Python verisi)
+
+        # En çok yükselenler / düşenler (Python verisi) - tıklanabilir
         if not df_data.empty:
             top5u = df_data.nlargest(5,"Değişim %")
             top5d = df_data.nsmallest(5,"Değişim %")
             for title, data, color in [
-                ("Yükselenler", top5u, "#089981"),
-                ("Düşenler",    top5d, "#f23645"),
+                ("🟢 Yükselenler", top5u, "#089981"),
+                ("🔴 Düşenler",    top5d, "#f23645"),
             ]:
                 st.markdown(f'<div style="font-size:0.82rem;font-weight:700;color:{color};margin:10px 0 4px;">{title}</div>', unsafe_allow_html=True)
                 rows = f'<div style="background:{card_bg};border:1px solid {border_color};border-radius:6px;overflow:hidden;">'
                 for _, r in data.iterrows():
                     s = "+" if r["Değişim %"]>=0 else ""
-                    rows += f"""<div style="display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid {border_color};">
-                        <span style="font-weight:600;color:{blue_brand};">{r['Sembol']}</span>
-                        <span style="color:{color};font-weight:600;">{s}{r['Değişim %']:.2f}%</span>
+                    rsi_val = f"{r['RSI']:.0f}" if pd.notna(r['RSI']) else "—"
+                    rows += f"""<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid {border_color};">
+                        <div>
+                            <span style="font-weight:700;color:{color};">{r['Sembol']}</span>
+                            <span style="font-size:0.7rem;color:#787b86;margin-left:6px;">RSI {rsi_val}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="color:{color};font-weight:700;font-size:0.9rem;">{s}{r['Değişim %']:.2f}%</div>
+                            <div style="font-size:0.7rem;color:#787b86;">{r['Fiyat']:,.2f}</div>
+                        </div>
                     </div>"""
                 rows += "</div>"
                 st.markdown(rows, unsafe_allow_html=True)
@@ -408,35 +440,57 @@ with tab_chart:
     col_adv, col_gauge = st.columns([3, 1])
     with col_adv:
         st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:5px;">Gelişmiş Grafik — {tv_sym}</div>', unsafe_allow_html=True)
-        components.html(f"""
-            <div class="tradingview-widget-container" style="height:600px;width:100%;">
-              <div id="tv_adv_{chart_sym}"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-              <script type="text/javascript">
-              new TradingView.widget({{
-                "autosize":true,"symbol":"{tv_sym}","interval":"D",
-                "timezone":"Europe/Istanbul","theme":"{tv_theme}","style":"1",
-                "locale":"tr","backgroundColor":"{bg_color}",
-                "allow_symbol_change":true,"details":true,"hotlist":true,
-                "container_id":"tv_adv_{chart_sym}"
-              }});
-              </script>
-            </div>""", height=620, scrolling=False)
+        adv_chart_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:600px;width:100%;">
+  <div id="tv_adv_{chart_sym}" style="height:600px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <script type="text/javascript">
+  new TradingView.widget({{
+    "autosize":true,
+    "symbol":"{tv_sym}",
+    "interval":"D",
+    "timezone":"Europe/Istanbul",
+    "theme":"{tv_theme}",
+    "style":"1",
+    "locale":"tr",
+    "backgroundColor":"{bg_color}",
+    "allow_symbol_change":true,
+    "details":true,
+    "hotlist":true,
+    "container_id":"tv_adv_{chart_sym}"
+  }});
+  </script>
+</div>
+</body></html>"""
+        components.html(adv_chart_html, height=620, scrolling=False)
 
     with col_gauge:
         st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:5px;">Teknik Kadran</div>', unsafe_allow_html=True)
-        components.html(f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript"
-                src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
-              {{
-                "interval":"1D","width":"100%","isTransparent":true,"height":"300",
-                "symbol":"{tv_sym}","showIntervalTabs":true,
-                "displayMode":"single","locale":"tr","colorTheme":"{tv_theme}"
-              }}
-              </script>
-            </div>""", height=320, scrolling=False)
+        gauge_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:300px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:300px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
+  {{
+    "interval":"1D",
+    "width":"100%",
+    "isTransparent":false,
+    "height":"300",
+    "symbol":"{tv_sym}",
+    "showIntervalTabs":true,
+    "displayMode":"single",
+    "locale":"tr",
+    "colorTheme":"{tv_theme}"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(gauge_html, height=320, scrolling=False)
 
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
@@ -467,19 +521,30 @@ with tab_chart:
             </div>""", unsafe_allow_html=True)
 
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        components.html(f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript"
-                src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
-              {{
-                "symbol":"{tv_sym}","width":"100%","height":"200",
-                "locale":"tr","dateRange":"12M","colorTheme":"{tv_theme}",
-                "trendLineColor":"#2962ff","underLineColor":"rgba(41,98,255,0.1)",
-                "isTransparent":true,"autosize":true,"largeChartUrl":""
-              }}
-              </script>
-            </div>""", height=220, scrolling=False)
+        mini_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:200px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:200px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js">
+  {{
+    "symbol":"{tv_sym}",
+    "width":"100%",
+    "height":"200",
+    "locale":"tr",
+    "dateRange":"12M",
+    "colorTheme":"{tv_theme}",
+    "trendLineColor":"#2962ff",
+    "underLineColor":"rgba(41,98,255,0.1)",
+    "isTransparent":false,
+    "autosize":true,
+    "largeChartUrl":""
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(mini_html, height=220, scrolling=False)
 
 # ╔══════════════════════════════════════════╗
 # ║  SEKME 3: YAPAY ZEKA (AI) & TARAYICI     ║
@@ -865,57 +930,183 @@ with tab_portfolio:
 with tab_macro:
     c_m1, c_m2 = st.columns(2)
     with c_m1:
-        st.markdown("### 📰 Küresel Haber Akışı")
-        components.html(
-            f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js" async>
-              {{ "feedMode": "all_symbols", "colorTheme": "{tv_theme}", "isTransparent": true, "displayMode": "regular", "width": "100%", "height": "550", "locale": "tr" }}
-              </script>
-            </div>
-            """, height=570
-        )
+        st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:6px;">📰 Küresel Haber Akışı</div>', unsafe_allow_html=True)
+        news_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:550px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:550px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js">
+  {{
+    "feedMode":"all_symbols",
+    "colorTheme":"{tv_theme}",
+    "isTransparent":false,
+    "displayMode":"regular",
+    "width":"100%",
+    "height":"550",
+    "locale":"tr"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(news_html, height=570, scrolling=False)
     with c_m2:
-        st.markdown("### 📅 Ekonomik Takvim")
-        components.html(
-            f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-              {{ "colorTheme": "{tv_theme}", "isTransparent": true, "width": "100%", "height": "550", "locale": "tr", "importanceFilter": "-1,0,1", "currencyFilter": "USD,EUR,TRY" }}
-              </script>
-            </div>
-            """, height=570
-        )
+        st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:6px;">📅 Ekonomik Takvim</div>', unsafe_allow_html=True)
+        calendar_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:550px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:550px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js">
+  {{
+    "colorTheme":"{tv_theme}",
+    "isTransparent":false,
+    "width":"100%",
+    "height":"550",
+    "locale":"tr",
+    "importanceFilter":"-1,0,1",
+    "currencyFilter":"USD,EUR,TRY"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(calendar_html, height=570, scrolling=False)
 
 # ╔══════════════════════════════════════════╗
 # ║  SEKME 6: ŞİRKET PROFILİ & BİLANÇOLAR    ║
 # ╚══════════════════════════════════════════╝
 with tab_fundamentals:
-    f_sym = st.text_input("Şirket Sembolü Girin (Örn: BIST:KCHOL, NASDAQ:AAPL)", value="BIST:THYAO")
+    # Seçili hisseden otomatik sembol belirle
+    selected = st.session_state.get("selected_stock", "THYAO")
+    
+    # Piyasaya göre TradingView formatına çevir
+    if secilen_piyasa == "BIST 100":
+        auto_sym = f"BIST:{selected}"
+    elif secilen_piyasa == "Kripto (USD)":
+        auto_sym = f"BINANCE:{selected}USDT"
+    else:
+        auto_sym = f"NASDAQ:{selected}"
+
+    st.markdown(f"""
+    <div style="background:{card_bg};border:1px solid {border_color};border-radius:8px;
+    padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+        <div style="font-size:1.5rem;">🏢</div>
+        <div>
+            <div style="font-size:1.1rem;font-weight:800;color:{blue_brand};">{selected}</div>
+            <div style="font-size:0.72rem;color:#787b86;text-transform:uppercase;letter-spacing:0.08em;">
+                Aktif Hisse · TradingView: {auto_sym} · {secilen_piyasa}</div>
+        </div>
+        <div style="margin-left:auto;font-size:0.75rem;color:#787b86;">
+            Hisseyi değiştirmek için <b style="color:{text_main};">📈 Pro Grafik</b> sekmesinden seçin
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     col_f1, col_f2 = st.columns([1, 1])
     with col_f1:
-        st.markdown("### 🏢 Finansal Bilançolar")
-        components.html(
-            f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
-              {{ "colorTheme": "{tv_theme}", "isTransparent": true, "displayMode": "regular", "width": "100%", "height": "550", "symbol": "{f_sym}", "locale": "tr" }}
-              </script>
-            </div>
-            """, height=570
-        )
+        st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:6px;">📊 Finansal Bilançolar</div>', unsafe_allow_html=True)
+        financials_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:550px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:550px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js">
+  {{
+    "colorTheme":"{tv_theme}",
+    "isTransparent":false,
+    "displayMode":"regular",
+    "width":"100%",
+    "height":"550",
+    "symbol":"{auto_sym}",
+    "locale":"tr"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(financials_html, height=570, scrolling=False)
+
     with col_f2:
-        st.markdown("### 📰 Şirket Profili")
-        components.html(
-            f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js" async>
-              {{ "width": "100%", "height": "550", "colorTheme": "{tv_theme}", "isTransparent": true, "symbol": "{f_sym}", "locale": "tr" }}
-              </script>
-            </div>
-            """, height=570
-        )
+        st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:6px;">🏢 Şirket Profili</div>', unsafe_allow_html=True)
+        profile_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:550px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:550px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js">
+  {{
+    "width":"100%",
+    "height":"550",
+    "colorTheme":"{tv_theme}",
+    "isTransparent":false,
+    "symbol":"{auto_sym}",
+    "locale":"tr"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(profile_html, height=570, scrolling=False)
+
+    # Alt kısım: Teknik Analiz + Sembol Detay
+    st.markdown(f"<hr style='border-color:{border_color};margin:14px 0;'>", unsafe_allow_html=True)
+    col_f3, col_f4 = st.columns([1, 1])
+    with col_f3:
+        st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:6px;">📐 Teknik Analiz Özeti</div>', unsafe_allow_html=True)
+        techsum_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:400px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:400px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
+  {{
+    "interval":"1D",
+    "width":"100%",
+    "isTransparent":false,
+    "height":"400",
+    "symbol":"{auto_sym}",
+    "showIntervalTabs":true,
+    "displayMode":"single",
+    "locale":"tr",
+    "colorTheme":"{tv_theme}"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(techsum_html, height=420, scrolling=False)
+
+    with col_f4:
+        st.markdown(f'<div style="font-size:1rem;font-weight:700;color:{text_main};margin-bottom:6px;">📋 Sembol Detayları</div>', unsafe_allow_html=True)
+        detail_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{{margin:0;padding:0;background:{bg_color};}}</style>
+</head><body>
+<div class="tradingview-widget-container" style="height:400px;width:100%;">
+  <div class="tradingview-widget-container__widget" style="height:400px;width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js">
+  {{
+    "symbols":[["{selected}","{auto_sym}|1D"]],
+    "chartOnly":false,
+    "width":"100%",
+    "height":"400",
+    "locale":"tr",
+    "colorTheme":"{tv_theme}",
+    "autosize":true,
+    "showVolume":true,
+    "hideDateRanges":false,
+    "hideMarketStatus":false,
+    "scalePosition":"right",
+    "scaleMode":"Normal",
+    "fontFamily":"Inter, sans-serif",
+    "fontSize":"10",
+    "noTimeScale":false,
+    "valuesTracking":"1",
+    "changeMode":"price-and-percent"
+  }}
+  </script>
+</div>
+</body></html>"""
+        components.html(detail_html, height=420, scrolling=False)
