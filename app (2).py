@@ -15,7 +15,8 @@ import yfinance as yf
 import requests
 import json
 import time
-import feedparser
+import feedparser 
+import google.generativeai as genai
 import sqlite3
 import os
 from datetime import datetime, timedelta
@@ -576,26 +577,31 @@ def fetch_news():
 # KATMAN 2 — CLAUDE AI ÖNERI MOTORU
 # ─────────────────────────────────────────────
 def call_claude_api(messages, system_prompt="", max_tokens=1000):
+    """Gemini API ile çalışır — aynı arayüz korundu"""
     try:
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "model": "claude-sonnet-4-6",
-            "max_tokens": max_tokens,
-            "system": system_prompt,
-            "messages": messages
-        }
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=headers,
-            json=payload,
-            timeout=30
+        import os
+        api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+        if not api_key:
+            return "API key bulunamadı. Streamlit Secrets'a GEMINI_API_KEY ekleyin."
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=system_prompt if system_prompt else "Sen yardımcı bir asistansın."
         )
-        if r.status_code == 200:
-            data = r.json()
-            return data["content"][0]["text"]
-        return None
-    except:
-        return None
+        
+        # Mesaj geçmişini Gemini formatına çevir
+        history = []
+        for msg in messages[:-1]:
+            role = "user" if msg["role"] == "user" else "model"
+            history.append({"role": role, "parts": [msg["content"]]})
+        
+        chat = model.start_chat(history=history)
+        last_msg = messages[-1]["content"]
+        response = chat.send_message(last_msg)
+        return response.text
+    except Exception as e:
+        return f"AI hatası: {str(e)}"
 
 def generate_ai_recommendation(stock_data_row, news_context, market_context, budget_per_stock):
     """Tek bir hisse için Claude AI'dan gerekçeli öneri al"""
