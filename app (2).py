@@ -582,31 +582,47 @@ def fetch_news():
 # KATMAN 2 — CLAUDE AI ÖNERI MOTORU
 # ─────────────────────────────────────────────
 def call_claude_api(messages, system_prompt="", max_tokens=1000):
-    """Gemini API ile çalışır — aynı arayüz korundu"""
-    try:
-        import os
-        api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
-        if not api_key:
-            return "API key bulunamadı. Streamlit Secrets'a GEMINI_API_KEY ekleyin."
-        
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-           model_name="gemini-2.0-flash",
-            system_instruction=system_prompt if system_prompt else "Sen yardımcı bir asistansın."
-        )
-        
-        # Mesaj geçmişini Gemini formatına çevir
-        history = []
-        for msg in messages[:-1]:
-            role = "user" if msg["role"] == "user" else "model"
-            history.append({"role": role, "parts": [msg["content"]]})
-        
-        chat = model.start_chat(history=history)
-        last_msg = messages[-1]["content"]
-        response = chat.send_message(last_msg)
-        return response.text
-    except Exception as e:
-        return f"AI hatası: {str(e)}"
+    """Gemini API ile çalışır — otomatik retry ile"""
+    import os
+    api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+    if not api_key:
+        return "API key bulunamadı. Streamlit Secrets a GEMINI_API_KEY ekleyin."
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name="gemini-2.0-flash",
+        system_instruction=system_prompt if system_prompt else "Sen yardımcı bir asistansın."
+    )
+
+    history = []
+    for msg in messages[:-1]:
+        role = "user" if msg["role"] == "user" else "model"
+        history.append({"role": role, "parts": [msg["content"]]})
+
+    last_msg = messages[-1]["content"]
+
+    max_retries = 4
+    for attempt in range(max_retries):
+        try:
+            chat = model.start_chat(history=history)
+            response = chat.send_message(last_msg)
+            return response.text
+        except Exception as e:
+            err_str = str(e)
+            # 429 Rate limit — retry ile bekle
+            if "429" in err_str:
+                # retry_delay değerini parse etmeye çalış
+                import re
+                delay_match = re.search(r"retry in ([0-9.]+)s", err_str)
+                wait = float(delay_match.group(1)) if delay_match else (2 ** attempt * 2)
+                wait = min(wait + 1, 30)  # max 30 sn bekle
+                if attempt < max_retries - 1:
+                    time.sleep(wait)
+                    continue
+                return "Gemini kota limitine ulaşıldı (429). Lütfen birkaç saniye bekleyip tekrar deneyin. Ucretli plana gectiyseniz Google AI Studio uzerinden billing ayarlarini kontrol edin."
+            # Diğer hatalar
+            return f"AI hatası: {err_str}"
+    return "Maksimum deneme sayısına ulaşıldı. Lütfen daha sonra tekrar deneyin."
 
 def generate_ai_recommendation(stock_data_row, news_context, market_context, budget_per_stock):
     """Tek bir hisse için Claude AI'dan gerekçeli öneri al"""
