@@ -16,7 +16,7 @@ import requests
 import json
 import time
 import feedparser 
-import google.generativeai as genai
+from google import genai as genai_client
 import sqlite3
 import os
 from datetime import datetime, timedelta
@@ -588,22 +588,20 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
     if not api_key:
         return "API key bulunamadı. Streamlit Secrets a GEMINI_API_KEY ekleyin."
 
-    genai.configure(api_key=api_key)
+    client = genai_client.Client(api_key=api_key)
 
-    # Pro plan model öncelik sırası — hangisi aktifse o kullanılır
+    # Pro plan model öncelik sırası
     MODEL_PRIORITY = [
         "gemini-2.5-pro-preview-05-06",
         "gemini-2.5-pro",
+        "gemini-2.0-pro",
         "gemini-1.5-pro",
         "gemini-2.0-flash",
         "gemini-1.5-flash",
     ]
 
-    history = []
-    for msg in messages[:-1]:
-        role = "user" if msg["role"] == "user" else "model"
-        history.append({"role": role, "parts": [msg["content"]]})
-    last_msg = messages[-1]["content"]
+    # Sistem prompt + mesajları tek string olarak birleştir
+    full_system = system_prompt if system_prompt else "Sen yardımcı bir asistansın."
 
     import re
     last_error = ""
@@ -611,12 +609,20 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                model = genai.GenerativeModel(
-                    model_name=model_name,
-                    system_instruction=system_prompt if system_prompt else "Sen yardımcı bir asistansın."
+                from google.genai import types as genai_types
+                contents = []
+                for msg in messages:
+                    role = "user" if msg["role"] == "user" else "model"
+                    contents.append(genai_types.Content(role=role, parts=[genai_types.Part(text=msg["content"])]))
+
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=genai_types.GenerateContentConfig(
+                        system_instruction=full_system,
+                        max_output_tokens=max_tokens,
+                    )
                 )
-                chat = model.start_chat(history=history)
-                response = chat.send_message(last_msg)
                 return response.text
             except Exception as e:
                 err_str = str(e)
@@ -627,14 +633,14 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
                     if attempt < max_retries - 1:
                         time.sleep(wait)
                         continue
-                    last_error = f"429 — {model_name} kota doldu, sonraki model deneniyor..."
-                    break  # bu modeli bırak, sıradakine geç
+                    last_error = f"429 — {model_name} kota doldu"
+                    break
                 elif "404" in err_str or "not found" in err_str.lower():
                     last_error = f"404 — {model_name}: {err_str[:120]}"
-                    break  # bu model yok, sıradakine geç
+                    break
                 else:
-                    return f"AI hatası ({model_name}): {err_str[:300]}"
-    return f"Hiçbir model çalışmadı. Son hata: {last_error}"
+                    return f"AI hatasi ({model_name}): {err_str[:300]}"
+    return f"Hicbir model calismadi. Son hata: {last_error}"
 
 def generate_ai_recommendation(stock_data_row, news_context, market_context, budget_per_stock):
     """Tek bir hisse için Claude AI'dan gerekçeli öneri al"""
