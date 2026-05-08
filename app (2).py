@@ -589,40 +589,52 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
         return "API key bulunamadı. Streamlit Secrets a GEMINI_API_KEY ekleyin."
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
-        system_instruction=system_prompt if system_prompt else "Sen yardımcı bir asistansın."
-    )
+
+    # Pro plan model öncelik sırası — hangisi aktifse o kullanılır
+    MODEL_PRIORITY = [
+        "gemini-2.5-pro-preview-05-06",
+        "gemini-2.5-pro",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
 
     history = []
     for msg in messages[:-1]:
         role = "user" if msg["role"] == "user" else "model"
         history.append({"role": role, "parts": [msg["content"]]})
-
     last_msg = messages[-1]["content"]
 
-    max_retries = 4
-    for attempt in range(max_retries):
-        try:
-            chat = model.start_chat(history=history)
-            response = chat.send_message(last_msg)
-            return response.text
-        except Exception as e:
-            err_str = str(e)
-            # 429 Rate limit — retry ile bekle
-            if "429" in err_str:
-                # retry_delay değerini parse etmeye çalış
-                import re
-                delay_match = re.search(r"retry in ([0-9.]+)s", err_str)
-                wait = float(delay_match.group(1)) if delay_match else (2 ** attempt * 2)
-                wait = min(wait + 1, 30)  # max 30 sn bekle
-                if attempt < max_retries - 1:
-                    time.sleep(wait)
-                    continue
-                return "Gemini kota limitine ulaşıldı (429). Lütfen birkaç saniye bekleyip tekrar deneyin. Ucretli plana gectiyseniz Google AI Studio uzerinden billing ayarlarini kontrol edin."
-            # Diğer hatalar
-            return f"AI hatası: {err_str}"
-    return "Maksimum deneme sayısına ulaşıldı. Lütfen daha sonra tekrar deneyin."
+    import re
+    last_error = ""
+    for model_name in MODEL_PRIORITY:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                model = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=system_prompt if system_prompt else "Sen yardımcı bir asistansın."
+                )
+                chat = model.start_chat(history=history)
+                response = chat.send_message(last_msg)
+                return response.text
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str:
+                    delay_match = re.search(r"retry in ([0-9.]+)s", err_str)
+                    wait = float(delay_match.group(1)) if delay_match else (2 ** attempt * 2)
+                    wait = min(wait + 1, 20)
+                    if attempt < max_retries - 1:
+                        time.sleep(wait)
+                        continue
+                    last_error = f"429 — {model_name} kota doldu, sonraki model deneniyor..."
+                    break  # bu modeli bırak, sıradakine geç
+                elif "404" in err_str or "not found" in err_str.lower():
+                    last_error = f"Model bulunamadı: {model_name}"
+                    break  # bu model yok, sıradakine geç
+                else:
+                    return f"AI hatası: {err_str}"
+    return f"Hiçbir Gemini modeli yanıt vermedi. Son hata: {last_error}"
 
 def generate_ai_recommendation(stock_data_row, news_context, market_context, budget_per_stock):
     """Tek bir hisse için Claude AI'dan gerekçeli öneri al"""
