@@ -422,7 +422,7 @@ def compute_macd(series):
         return np.nan, np.nan
 
 @st.cache_data(ttl=600, show_spinner=False)
-def fetch_market_data(tickers_dict):
+def fetch_market_data(tickers_dict, rsi_buy_threshold=35, rsi_sell_threshold=68):
     end = datetime.today()
     start = end - timedelta(days=90)
     rows = []
@@ -431,6 +431,9 @@ def fetch_market_data(tickers_dict):
         try:
             df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
             if df.empty or len(df) < 30: return None
+            # MultiIndex sutunlari duzelt
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
             close = df["Close"].squeeze()
             vol   = df["Volume"].squeeze()
             p_last = float(close.iloc[-1])
@@ -445,8 +448,8 @@ def fetch_market_data(tickers_dict):
             ma20 = float(close.rolling(20).mean().iloc[-1])
             ma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else ma20
 
-            threshold = st.session_state.learning_params.get("rsi_buy_threshold", 35)
-            sell_threshold = st.session_state.learning_params.get("rsi_sell_threshold", 68)
+            threshold = rsi_buy_threshold
+            sell_threshold = rsi_sell_threshold
 
             score = 0
             if pd.notna(rsi):
@@ -493,6 +496,8 @@ def fetch_macro():
     for t, name in tickers.items():
         try:
             df = yf.download(t, period="5d", interval="1h", progress=False, auto_adjust=True)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
             if not df.empty and len(df) >= 3:
                 close = df["Close"].squeeze().dropna()
                 curr = float(close.iloc[-1])
@@ -586,7 +591,7 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
         
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
-           model_name="gemini-1.5-flash-latest",
+           model_name="gemini-2.0-flash",
             system_instruction=system_prompt if system_prompt else "Sen yardımcı bir asistansın."
         )
         
@@ -727,7 +732,7 @@ elif secilen_piyasa == "Kripto (USD)": aktif_tickerlar = TICKERS_CRYPTO
 else:                                  aktif_tickerlar = TICKERS_US
 
 aktif_semboller = list(aktif_tickerlar.values())
-df_data = fetch_market_data(aktif_tickerlar)
+df_data = fetch_market_data(aktif_tickerlar, st.session_state.learning_params.get("rsi_buy_threshold",35), st.session_state.learning_params.get("rsi_sell_threshold",68))
 
 # Macro ticker bandı
 def _tick_html(label, price, chg, fmt=".2f", prefix=""):
