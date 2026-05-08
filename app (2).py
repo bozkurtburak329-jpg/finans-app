@@ -630,11 +630,11 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
                     last_error = f"429 — {model_name} kota doldu, sonraki model deneniyor..."
                     break  # bu modeli bırak, sıradakine geç
                 elif "404" in err_str or "not found" in err_str.lower():
-                    last_error = f"Model bulunamadı: {model_name}"
+                    last_error = f"404 — {model_name}: {err_str[:120]}"
                     break  # bu model yok, sıradakine geç
                 else:
-                    return f"AI hatası: {err_str}"
-    return f"Hiçbir Gemini modeli yanıt vermedi. Son hata: {last_error}"
+                    return f"AI hatası ({model_name}): {err_str[:300]}"
+    return f"Hiçbir model çalışmadı. Son hata: {last_error}"
 
 def generate_ai_recommendation(stock_data_row, news_context, market_context, budget_per_stock):
     """Tek bir hisse için Claude AI'dan gerekçeli öneri al"""
