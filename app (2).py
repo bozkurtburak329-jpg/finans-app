@@ -16,7 +16,7 @@ import requests
 import json
 import time
 import feedparser 
-from google import genai as genai_client
+# google-genai SDK kullanilmiyor, direkt REST API kullaniliyor
 import sqlite3
 import os
 from datetime import datetime, timedelta
@@ -582,65 +582,63 @@ def fetch_news():
 # KATMAN 2 — CLAUDE AI ÖNERI MOTORU
 # ─────────────────────────────────────────────
 def call_claude_api(messages, system_prompt="", max_tokens=1000):
-    """Gemini API ile çalışır — otomatik retry ile"""
-    import os
+    """Gemini REST API v1 — SDK bağımlılığı yok"""
+    import os, requests, re, time
     api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
     if not api_key:
         return "API key bulunamadı. Streamlit Secrets a GEMINI_API_KEY ekleyin."
 
-    client = genai_client.Client(api_key=api_key)
-
-    # Pro plan model öncelik sırası
     MODEL_PRIORITY = [
         "gemini-2.5-pro-preview-05-06",
         "gemini-2.5-pro",
-        "gemini-2.0-pro",
         "gemini-1.5-pro",
         "gemini-2.0-flash",
         "gemini-1.5-flash",
     ]
 
-    # Sistem prompt + mesajları tek string olarak birleştir
-    full_system = system_prompt if system_prompt else "Sen yardımcı bir asistansın."
+    # Mesajları REST formatına çevir
+    contents = []
+    if system_prompt:
+        contents.append({"role": "user", "parts": [{"text": f"[Sistem talimatı]: {system_prompt}"}]})
+        contents.append({"role": "model", "parts": [{"text": "Anladım, talimatlarınıza göre hareket edeceğim."}]})
+    for msg in messages:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
-    import re
+    payload = {"contents": contents, "generationConfig": {"maxOutputTokens": max_tokens}}
+
     last_error = ""
     for model_name in MODEL_PRIORITY:
-        max_retries = 3
-        for attempt in range(max_retries):
+        url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={api_key}"
+        for attempt in range(3):
             try:
-                from google.genai import types as genai_types
-                contents = []
-                for msg in messages:
-                    role = "user" if msg["role"] == "user" else "model"
-                    contents.append(genai_types.Content(role=role, parts=[genai_types.Part(text=msg["content"])]))
-
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=genai_types.GenerateContentConfig(
-                        system_instruction=full_system,
-                        max_output_tokens=max_tokens,
-                    )
-                )
-                return response.text
-            except Exception as e:
-                err_str = str(e)
-                if "429" in err_str:
-                    delay_match = re.search(r"retry in ([0-9.]+)s", err_str)
-                    wait = float(delay_match.group(1)) if delay_match else (2 ** attempt * 2)
-                    wait = min(wait + 1, 20)
-                    if attempt < max_retries - 1:
+                resp = requests.post(url, json=payload, timeout=30)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                elif resp.status_code == 429:
+                    wait = 2 ** attempt * 2
+                    try:
+                        retry_info = resp.json().get("error",{}).get("message","")
+                        m = re.search(r"retry in ([0-9.]+)s", retry_info)
+                        if m: wait = float(m.group(1)) + 1
+                    except: pass
+                    wait = min(wait, 20)
+                    if attempt < 2:
                         time.sleep(wait)
                         continue
                     last_error = f"429 — {model_name} kota doldu"
                     break
-                elif "404" in err_str or "not found" in err_str.lower():
-                    last_error = f"404 — {model_name}: {err_str[:120]}"
+                elif resp.status_code == 404:
+                    last_error = f"404 — {model_name} bulunamadı"
                     break
                 else:
-                    return f"AI hatasi ({model_name}): {err_str[:300]}"
-    return f"Hicbir model calismadi. Son hata: {last_error}"
+                    last_error = f"{resp.status_code} — {model_name}: {resp.text[:150]}"
+                    break
+            except Exception as e:
+                last_error = f"Bağlantı hatası ({model_name}): {str(e)[:100]}"
+                break
+    return f"AI hatası: {last_error}"
 
 def generate_ai_recommendation(stock_data_row, news_context, market_context, budget_per_stock):
     """Tek bir hisse için Claude AI'dan gerekçeli öneri al"""
