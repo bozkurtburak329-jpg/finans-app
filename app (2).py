@@ -589,11 +589,11 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
         return "API key bulunamadı. Streamlit Secrets a GEMINI_API_KEY ekleyin."
 
     MODEL_PRIORITY = [
-        "gemini-2.5-pro-preview-05-06",
-        "gemini-2.5-pro",
-        "gemini-1.5-pro",
         "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
         "gemini-1.5-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-1.5-pro",
     ]
 
     # Mesajları REST formatına çevir
@@ -609,7 +609,7 @@ def call_claude_api(messages, system_prompt="", max_tokens=1000):
 
     last_error = ""
     for model_name in MODEL_PRIORITY:
-        url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         for attempt in range(3):
             try:
                 resp = requests.post(url, json=payload, timeout=30)
